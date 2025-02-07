@@ -1,0 +1,10 @@
+post_processing/
+post_process.ipynb
+postprocess_template.ipynb
+postprocess.ipynb
+post_process_clean.ipynb
+
+*/__pycache__
+*/.pytest_cache
+
+.vscode/
