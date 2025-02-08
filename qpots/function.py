@@ -38,7 +38,7 @@ class Function:
 
         if self.custom_func:
             # Validate custom function setup
-            if not self.bounds:
+            if self.bounds is None:
                 raise ValueError("Custom functions must specify bounds.")
         else:
             # Initialize predefined test functions

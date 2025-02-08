@@ -151,23 +151,14 @@ def test_gp_posterior_with_constraints():
 
 @patch("qpots.utils.pymoo_problem.nsga2")
 @pytest.mark.parametrize("q", [1, 2, 3, 4])
-def test_qpots(mock_nsga2, mock_func, mock_gp_cons, q):
-    pop_size = 100  # Expected population size
+def test_qpots(mock_func, real_func, q):
+    pop_size = 100
 
-    model_1 = Mock()
-    model_1.posterior.return_value.sample.return_value = torch.rand(pop_size, mock_func.dim)
-    model_2 = Mock()
-    model_2.posterior.return_value.sample.return_value = torch.rand(pop_size, mock_func.dim)
-    model_3 = Mock()
-    model_3.posterior.return_value.sample.return_value = torch.rand(pop_size, mock_func.dim)
-    mock_gp_cons.models = [model_1, model_2, model_3]
-    acq = Acquisition(func=mock_func, gps=mock_gp_cons, q=q)
-
-    
-    mock_nsga2.return_value = Mock(
-        X=torch.rand(pop_size, mock_func.dim),  # Mocked solutions with correct shape
-        F=torch.rand(pop_size, mock_gp_cons.nobj)  # Mocked objective values with correct shape 
-    )
+    train_x = torch.rand(pop_size, real_func.dim, dtype=torch.float64)
+    train_y = real_func.evaluate(train_x)
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps.fit_gp()
+    acq = Acquisition(func=mock_func, gps=gps, q=q)
 
     bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
     iteration = 1
@@ -175,7 +166,7 @@ def test_qpots(mock_nsga2, mock_func, mock_gp_cons, q):
         "nystrom": 0,
         "iters": 10,
         "dim": 2,
-        "nychoice": "pareto",
+        "nychoice": "random",
         "q": q,
         "ngen": 10,
     }
