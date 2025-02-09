@@ -2,8 +2,6 @@ import matlab.engine
 import numpy as np
 import torch
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from botorch.utils.multi_objective.pareto import is_non_dominated
-from botorch.utils.multi_objective.hypervolume import Hypervolume
 
 class TSEMORunner:
     """

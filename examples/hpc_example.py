@@ -60,8 +60,6 @@ for rep in range(args.reps):
         for i in range(args.iters):
             t1 = time.time()
             newx = acq.qpots(bounds=bounds, iteration=i, **vars(args))
-            #newx = acq.sobol()
-            #newx = acq.parego()
             t2 = time.time()
             times.append(t2 - t1)
 

@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 import pytest
 import torch
-import numpy as np
 import os
 import sys
 import warnings

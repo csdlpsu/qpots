@@ -1,5 +1,5 @@
 import torch
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable
 from torch import Tensor
 from scipy.spatial.distance import cdist
 from botorch.utils.transforms import normalize
@@ -31,7 +31,6 @@ from qpots.utils.utils import unstandardize, select_candidates
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
-from gpytorch.likelihoods import FixedNoiseGaussianLikelihood
 
 
 class Acquisition:

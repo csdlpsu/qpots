@@ -1,7 +1,6 @@
 from unittest.mock import Mock, patch
 import pytest
 import torch
-import numpy as np
 import os
 import sys
 import warnings
@@ -9,13 +8,7 @@ import warnings
 warnings.filterwarnings('ignore')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from botorch.models import SingleTaskGP, ModelListGP
-from botorch.models.transforms import Standardize
 from botorch.utils.sampling import manual_seed
-from botorch.utils.transforms import normalize
-from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
-from botorch.optim.optimize import optimize_acqf
-from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from qpots.acquisition import Acquisition
 from qpots.function import Function
 from qpots.model_object import ModelObject

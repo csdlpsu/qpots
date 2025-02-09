@@ -47,7 +47,7 @@ tf = Function(name=None, dim=args["dim"], nobj=args["nobj"], custom_func=custom_
 f = tf.evaluate
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(2024)
+torch.manual_seed(1023)
 
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double) # Normalized
 train_y = f(unnormalize(train_x, bounds=custom_bounds))

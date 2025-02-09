@@ -42,7 +42,7 @@ bounds = tf.get_bounds()
 cons = tf.get_cons()
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(2024)
+torch.manual_seed(1023)
 
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
 train_y = f(unnormalize(train_x, bounds))
