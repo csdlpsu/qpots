@@ -1,0 +1,5 @@
+function y = dh1(x)
+  dim = size(x, 2);
+  insert(py.sys.path, int32(0), '/storage/home/kkc5441/work/mobo/TS-EMO/BC_function.py');
+
+  dh1 = py.importlib.import_module('dh1_func');

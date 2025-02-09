@@ -1,0 +1,28 @@
+function [Xout, Yout, time_out] = TSEMO_run(func, x, no_out, no_in, lb, ub, iters)
+
+    f = str2func(func);
+
+    no_outputs = no_out;
+    no_inputs = no_in;
+    lb = lb;
+    ub = ub;
+
+    dataset_size = size(x,1);
+    X = x;
+    %X = lhsdesign(dataset_size, no_inputs);
+    Y = zeros(dataset_size, no_outputs);
+
+    py.sys.path().append('/storage/home/kkc5441/work/mobo/TS-EMO')
+    for k = 1:size(X,1)
+        X(k,:) = X(k,:).*(ub-lb)+lb;        % adjustment of bounds
+        Y(k,:) = f(X(k,:));                 % calculation of response data
+    end
+    opt = TSEMO_options;
+    opt.maxeval = 4*iters;
+    opt.NoOfBachSequential = 4;
+    [Xpareto,Ypareto,X,Y,XparetoGP,YparetoGP,YparetoGPstd,hypf,times] = TSEMO_V4(f,X,Y,lb,ub,opt);
+    Xout = X;
+    Yout = Y;
+    time_out = times;
+
+end
