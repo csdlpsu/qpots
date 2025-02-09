@@ -8,3 +8,18 @@ post_process_clean.ipynb
 */.pytest_cache
 
 .vscode/
+
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+.env/
+
+.ipynb_checkpoints/
+
+*.log

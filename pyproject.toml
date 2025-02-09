@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "botorch>=0.12.0", "torch>=2.4.1", "gpytorch>=1.13", "numpy>=1.25.2", "scipy>=1.11.4"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qPOTS"
+version = "1.0"
+authors = [
+  { name="Kade E. Carlson", email="kkc5441@psu.edu" },
+  { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
+]
+description = "A BoTorch wrapper for solving multiobjective optimization problems with an implementation of the qPOTS algorithm."
+readme = "README.rst"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = { file = "LICENSE" }
+
+[project.urls]
+Homepage = "https://github.com/csdlpsu/qpots"
+Issues = "https://github.com/csdlpsu/qpots/issues"
