@@ -4,7 +4,7 @@ This file demonstrates how to use a custom function
 import warnings
 import time
 import os
-import sys
+import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -58,13 +58,16 @@ gps.fit_gp()
 
 acq = Acquisition(f, gps, cons=None, device=device, q=args["q"])
 
+times, hvs = [], []
 for i in range(args["iters"]):
     t1 = time.time()
     newx = acq.qpots(bounds=custom_bounds, iteration=i, **args) # Returned as normalized values
     t2 = time.time()
+    times.append(t2 - t1)
 
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), custom_bounds))
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
+    hvs.append(hv)
 
     print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
         
@@ -72,3 +75,9 @@ for i in range(args["iters"]):
     train_y = torch.row_stack([train_y, newy])
     gps = ModelObject(train_x, train_y, custom_bounds, args["nobj"], args["ncons"], device=device)
     gps.fit_gp()
+
+    np.save(f"{args["wd"]}/train_x.npy", train_x)
+    np.save(f"{args["wd"]}/train_y.npy", train_y)
+    np.save(f"{args["wd"]}/hv.npy", hvs)
+    np.save(f"{args["wd"]}/times.npy", times)
+    

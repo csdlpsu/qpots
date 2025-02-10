@@ -4,7 +4,7 @@ This file demonstrates how to use multiple acquisition functions
 import warnings
 import time
 import os
-import sys
+import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -49,13 +49,17 @@ gps.fit_gp()
 
 acq = Acquisition(tf, gps, cons=None, device=device, q=args["q"])
 
+times, hvs = [], []
+args["wd"] = "qpots"
 for i in range(args["iters"]):
     t1 = time.time()
     newx = acq.qpots(bounds=bounds, iteration=i, **args)
     t2 = time.time()
+    times.append(t2 - t1)
 
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
+    hvs.append(hv)
         
     print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
 
@@ -63,6 +67,11 @@ for i in range(args["iters"]):
     train_y = torch.row_stack([train_y, newy])
     gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
     gps.fit_gp()
+
+    np.save(f"{args["wd"]}/train_x.npy", train_x)
+    np.save(f"{args["wd"]}/train_y.npy", train_y)
+    np.save(f"{args["wd"]}/hv.npy", hvs)
+    np.save(f"{args["wd"]}/times.npy", times)
 
 """
 To use another acquisition function in the same script, the process must be repeated
@@ -77,13 +86,17 @@ gps_par.fit_gp()
 
 acq = Acquisition(tf, gps_par, cons=None, device=device, q=args["q"])
 
+times, hvs = [], []
+args["wd"] = "parego"
 for j in range(args["iters"]):
     t1 = time.time()
     newx = acq.parego() # The only thing that really changes is this line, asking for a new acquisition
     t2 = time.time()
+    times.append(t2 - t1)
 
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     hv, _ = expected_hypervolume(gps_par, ref_point=args["ref_point"])
+    hvs.append(hv)
 
     print(f"Iteration: {j}, New candidate: {newx}, Time: {t2-t1}, HV: {hv}")
 
@@ -91,3 +104,8 @@ for j in range(args["iters"]):
     train_y = torch.row_stack([train_y, newy])
     gps_par = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
     gps_par.fit_gp()
+
+    np.save(f"{args["wd"]}/train_x.npy", train_x)
+    np.save(f"{args["wd"]}/train_y.npy", train_y)
+    np.save(f"{args["wd"]}/hv.npy", hvs)
+    np.save(f"{args["wd"]}/times.npy", times)
