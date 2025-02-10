@@ -46,10 +46,10 @@ For more thorough demonstrations on how qPOTS should be ran please see the examp
     warnings.filterwarnings('ignore')
     device = torch.device("cpu")
 
-    from qPOTS.acquisition import Acquisition 
-    from qPOTS.model_object import ModelObject 
-    from qPOTS.function import Function 
-    from qPOTS.utils.utils import expected_hypervolume
+    from qpots.acquisition import Acquisition 
+    from qpots.model_object import ModelObject 
+    from qpots.function import Function 
+    from qpots.utils.utils import expected_hypervolume
 
     args = dict(
         {
@@ -74,7 +74,7 @@ For more thorough demonstrations on how qPOTS should be ran please see the examp
 
     torch.manual_seed(1023)
 
-    train_x = torch.rand([[args["ntrain"], args["dim"]]])
+    train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.float64)
     train_y = f(unnormalize(train_x, bounds))
 
     gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=0, device=device)

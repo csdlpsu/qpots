@@ -14,7 +14,7 @@ class ModelObject:
                  nobj,
                  ncons,
                  device, 
-                 noise_std=1e-2):
+                 noise_std=1e-6):
         """
         Initialize the multi-objective GP models.
 
