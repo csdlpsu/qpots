@@ -27,7 +27,7 @@ jobs:
           release: latest
 
       - name: Check MATLAB Version (Debugging)
-        run: matlab -batch "disp(['MATLAB Version: ', version])"
+        run: matlab -batch "disp(version)"
 
 
       - name: Install dependencies
