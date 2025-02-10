@@ -26,6 +26,10 @@ jobs:
         with:
           release: latest
 
+      - name: Check MATLAB Version (Debugging)
+        run: matlab -batch "disp(['MATLAB Version: ', version])"
+
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
