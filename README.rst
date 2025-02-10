@@ -19,10 +19,10 @@ To install qpots with pip run the following command in a terminal::
 This will install all of the necessary dependencies except for matlab engine which is only needed for TS-EMO.
 To install matlab engine follow the instructions at this link: `https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html`_.
 Note that matlab engine is only required if one plans on using TS-EMO and must be installed for Python>=3.10. The BoTorch implementation of the other acquisition functions (including qPOTS) 
-only requires Python>=3.10 and the dependencies automatically installed by pip
+only requires Python>=3.10 and the dependencies automatically installed by pip.
 
 To build from source clone the repository and run pip in the top-level directory::
-    
+
     git clone https://github.com/csdlpsu/qpots
 
 Then run pip::
