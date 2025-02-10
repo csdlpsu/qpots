@@ -1,46 +1,45 @@
-qPOTS: Batch Pareto Optimal Thompson sampling
+qPOTS: Batch Pareto Optimal Thompson Sampling
 =============================================
 
-This repository contains the code for qPOTS, a multi-objective Bayesian optimization algorithm. 
+This repository contains the code for qPOTS, a multi-objective Bayesian optimization algorithm.  
 Read the paper on arXiv: `here <https://arxiv.org/pdf/2310.15788>`_.
 
-This repository is maintained by the Computational Complex Engineered Systems Design Laboratory (CSDL_) at Penn State.
+This repository is maintained by the Computational Complex Engineered Systems Design Laboratory (`CSDL`_) at Penn State.
 
 .. _CSDL: https://sites.psu.edu/csdl/
 
-================
 Installing qPOTS
 ================
 
-To install qpots with pip run the following command in a terminal::
+To install qPOTS with pip, run the following command in a terminal::
 
     pip install qPOTS
 
-This will install all of the necessary dependencies except for matlab engine which is only needed for TS-EMO.
-To install matlab engine follow the instructions at this link: `https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html`_.
-Note that matlab engine is only required if one plans on using TS-EMO and must be installed for Python>=3.10. The BoTorch implementation of the other acquisition functions (including qPOTS) 
-only requires Python>=3.10 and the dependencies automatically installed by pip.
+This will install all of the necessary dependencies except for the MATLAB Engine, which is only needed for TS-EMO.  
+To install the MATLAB Engine, follow the instructions at this link:  
+`Install MATLAB Engine for Python <https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html>`_.
 
-To build from source clone the repository and run pip in the top-level directory::
+**Note:** The MATLAB Engine is only required if you plan on using TS-EMO and must be installed for Python>=3.10.  
+The BoTorch implementation of the other acquisition functions (including qPOTS) only requires Python>=3.10 and the dependencies automatically installed by pip.
+
+To build from source, clone the repository and run pip in the top-level directory::
 
     git clone https://github.com/csdlpsu/qpots
-
-Then run pip::
-
+    cd qpots
     pip install .
 
-===============
 Quick Start
-===============
+===========
 
-A quick demonstration of qPOTS is below. This code can be ran to test your qPOTS installation.
+A quick demonstration of qPOTS is below. This code can be run to test your qPOTS installation.
 
-For more thorough demonstrations on how qPOTS should be ran please see the examples directory `examples/ <examples/>`_.
+For more thorough demonstrations on how qPOTS should be used, please see the `examples/` directory.
 
-.. code-block:: Python
+.. code-block:: python
 
     import torch 
     import warnings
+    import time
     from botorch.utils.transforms import unnormalize
 
     warnings.filterwarnings('ignore')
@@ -82,9 +81,8 @@ For more thorough demonstrations on how qPOTS should be ran please see the examp
 
     acq = Acquisition(tf, gps, device=device, q=args["q"])
 
-
     for i in range(args["iters"]):
-        t1 = time.time() # tracking time
+        t1 = time.time()
         newx = acq.qpots(bounds, i, **args)
         t2 = time.time()
         
