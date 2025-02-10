@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qPOTS"
-version = "1.0"
+version = "1.0.1"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
