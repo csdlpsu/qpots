@@ -43,6 +43,14 @@ For more thorough demonstrations on how qPOTS should be ran please see the examp
     import warnings
     from botorch.utils.transforms import unnormalize
 
+    warnings.filterwarnings('ignore')
+    device = torch.device("cpu")
+
+    from qPOTS.acquisition import Acquisition 
+    from qPOTS.model_object import ModelObject 
+    from qPOTS.function import Function 
+    from qPOTS.utils.utils import expected_hypervolume
+
     args = dict(
         {
             "ntrain": 20,
@@ -59,14 +67,6 @@ For more thorough demonstrations on how qPOTS should be ran please see the examp
             "ngen": 10,
         }
     )
-
-    warnings.filterwarnings('ignore')
-    device = torch.device("cpu")
-
-    from qPOTS.acquisition import Acquisition 
-    from qPOTS.model_object import ModelObject 
-    from qPOTS.function import Function 
-    from qPOTS.utils.utils import expected_hypervolume
 
     tf = Function('branincurrin', dim=args["dim"], nobj=args["nobj"])
     f = tf.evaluate
