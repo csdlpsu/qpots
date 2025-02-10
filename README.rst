@@ -33,3 +33,69 @@ Then run pip::
 Quick Start
 ===============
 
+A quick demonstration of qPOTS is below. This code can be ran to test your qPOTS installation.
+
+For more thorough demonstrations on how qPOTS should be ran please see the examples directory `examples/ <examples/>`_.
+
+.. code-block:: Python
+
+    import torch 
+    import warnings
+    from botorch.utils.transforms import unnormalize
+
+    args = dict(
+        {
+            "ntrain": 20,
+            "iters": 50,
+            "reps": 20,
+            "q": 1,
+            "wd": ".",
+            "ref_point": torch.tensor([-300.0, -18.0]),
+            "dim": 2,
+            "nobj": 2,
+            "ncons": 0,
+            "nystrom": 0,
+            "nychoice": "pareto",
+            "ngen": 10,
+        }
+    )
+
+    warnings.filterwarnings('ignore')
+    device = torch.device("cpu")
+
+    from qPOTS.acquisition import Acquisition 
+    from qPOTS.model_object import ModelObject 
+    from qPOTS.function import Function 
+    from qPOTS.utils.utils import expected_hypervolume
+
+    tf = Function('branincurrin', dim=args["dim"], nobj=args["nobj"])
+    f = tf.evaluate
+    bounds = tf.get_bounds()
+
+    torch.manual_seed(1023)
+
+    train_x = torch.rand([[args["ntrain"], args["dim"]]])
+    train_y = f(unnormalize(train_x, bounds))
+
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=0, device=device)
+    gps.fit_gp()
+
+    acq = Acquisition(tf, gps, device=device, q=args["q"])
+
+
+    for i in range(args["iters"]):
+        t1 = time.time() # tracking time
+        newx = acq.qpots(bounds, i, **args)
+        t2 = time.time()
+        
+        newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+        hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
+            
+        print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
+            
+        train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
+        train_y = torch.row_stack([train_y, newy])
+        gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
+        gps.fit_gp()
+
+This code prints the results to the terminal. If this works, then congratulations, you have successfully installed qPOTS!
