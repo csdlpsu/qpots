@@ -12,8 +12,6 @@ import time
 import numpy as np
 from mpi4py import MPI
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
 from qpots.function import Function
@@ -63,7 +61,6 @@ for rep in range(args.reps):
             t2 = time.time()
             times.append(t2 - t1)
 
-            newx = normalize(newx, bounds)
             newy = f(unnormalize(newx.reshape(-1, args.dim), bounds))
             newconsy = cons(unnormalize(newx.reshape(-1, args.dim), bounds))
             newy = torch.column_stack([newy.reshape(args.q, args.nobj),

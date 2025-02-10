@@ -7,7 +7,6 @@ import os
 import sys
 
 warnings.filterwarnings('ignore')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject

@@ -8,7 +8,6 @@ import time
 import sys
 
 warnings.filterwarnings('ignore')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
@@ -68,7 +67,6 @@ for i in range(args["iters"]):
     newx = acq.qpots(bounds, i, **args)
     t2 = time.time()
     
-    newx = normalize(newx, bounds)
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
         

@@ -8,7 +8,6 @@ import os
 import sys
 
 warnings.filterwarnings('ignore')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
@@ -36,7 +35,7 @@ args = dict(
         }
     )
 
-tf = Function('discbrake')
+tf = Function('discbrake', dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
 cons = tf.get_cons()
@@ -48,19 +47,19 @@ train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
 train_y = f(unnormalize(train_x, bounds))
 train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))]) # Stack constraints on top of objectives
 
-print(train_y.shape) # This should be n_train x (nobj + ncons) tensor
+print(train_y.shape, train_x.shape) # This should be n_train x (nobj + ncons) tensor
 
 gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
 gps.fit_gp()
 
-acq = Acquisition(f, gps, cons=cons, device=device, q=args["q"])
+acq = Acquisition(tf, gps, cons=cons, device=device, q=args["q"])
 
 for i in range(args["iters"]):
     t1 = time.time()
-    newx = acq.qpots(bounds=bounds, iteration=i, **args)
+    #newx = acq.qpots(bounds=bounds, iteration=i, **args)
+    newx = acq.parego()
     t2 = time.time()
 
-    newx = normalize(newx, bounds) # must normalize
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     newconsy = cons(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     newy = torch.column_stack([newy.reshape(args["q"], args["nobj"]),

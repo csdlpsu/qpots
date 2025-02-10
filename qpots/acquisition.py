@@ -294,6 +294,7 @@ class Acquisition:
         ).to(self.device) # normalized bounds
         train_x = self.gps.train_x.to(self.device)
         train_y = self.gps.train_y.to(self.device)
+        print(f"Inside parego: train_x shape: {train_x.shape}")
         sampler = SobolQMCNormalSampler(sample_shape=torch.Size([128]))
         model = ModelListGP(*self.gps.models).to(self.device)
         pred = unstandardize(model.posterior(train_x).mean, train_y)
