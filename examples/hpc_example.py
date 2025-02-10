@@ -6,7 +6,6 @@ mpirun python3 -m hpc_example --func branincurrin --rp " -300." " -18." --dim 2 
 """
 import warnings
 import os
-import sys
 import torch
 import time
 import numpy as np
@@ -16,7 +15,7 @@ from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
 from qpots.function import Function
 from qpots.utils.utils import expected_hypervolume, arg_parser
-from botorch.utils.transforms import unnormalize, normalize
+from botorch.utils.transforms import unnormalize
 
 # Set up MPI
 warnings.filterwarnings("ignore")
@@ -28,7 +27,7 @@ world_rank = comm_world.Get_rank()
 args = arg_parser() # For a list of arguments see the arg parser, these are command line arguments that must be set when running the code
 device = torch.device("cpu")
 
-tf = Function(name=args.func, dim=args.dim)
+tf = Function(name=args.func, dim=args.dim, nobj=args.nobj)
 f = tf.evaluate
 bounds = tf.get_bounds()
 args.ref_point = torch.tensor(args.ref_point, dtype=torch.double)
