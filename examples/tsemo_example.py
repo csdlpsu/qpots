@@ -42,5 +42,5 @@ gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["no
 gps.fit_gp()
 
 acq = Acquisition(tf, gps, cons=None, device=device, q=args["q"])
-x, y, times, hv = acq.tsemo(args["wd"], args["iters"], args["ref_point"], args["ntrain"], args["reps"])
+x, y, times, hv, pf = acq.tsemo(args["wd"], args["iters"], args["ref_point"], args["ntrain"], args["reps"])
 print(f"Candidates: {x}, HVs: {hv}")

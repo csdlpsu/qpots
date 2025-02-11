@@ -52,7 +52,7 @@ class Acquisition:
         Initialize the multi-objective acquisition class.
 
         Parameters:
-            func (Callable): The test function being optimized.
+            func (Function): The test function being optimized.
             gps (ModelListGP): Gaussian Process models.
             cons (Optional[Callable]): A vector-valued function of inequality constraints.
             device (torch.device): Device for computation (CPU/GPU).
@@ -480,7 +480,24 @@ class Acquisition:
             bounds=standard_bounds, n=1, q=self.q
         ).squeeze(1).to(self.device)
     
-    def tsemo(self, save_dir, iters, ref_point, train_shape, rep=0):
+    def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int=0):
+        """
+        Perform Thompson Sampling Efficient Multiobjective Optimization (TS-EMO).
+
+        Parameters:
+            save_dir (str): The directory to save the TS-EMO results.
+            iters (int): How many iters TS-EMO should run for.
+            ref_point (Tensor): The reference point for the hypervolume calculation.
+            train_shape (int): The train_shape for determining the size of bounds.
+            rep (int): The repetition of the experiment. Defaults to 0.
+
+        Returns:
+            x (numpy.ndarray): The inputs of the function chosen by TS-EMO.
+            y (numpy.ndarray): The outputs of the function for each input.
+            times (numpy.ndarray): The time that each iteration takes.
+            hv (list): The list of the hypervolume at each iteration.
+            pf (Tensor): The Pareto frontier determined by TS-EMO.
+        """
         ts = TSEMORunner(self.func.name, 
                          self.gps.train_x, 
                          self.gps.train_y, 
@@ -489,7 +506,7 @@ class Acquisition:
                          iters=iters, 
                          batch_number=self.q)
         x, y, times = ts.tsemo_run(save_dir, rep)
-        hv = ts.tsemo_hypervolume(y, ref_point, train_shape, iters)
-        return x, y, times, hv
+        hv, pf = ts.tsemo_hypervolume(y, ref_point, train_shape, iters)
+        return x, y, times, hv, pf
 
         

@@ -2,6 +2,7 @@ import torch
 from pymoo.core.problem import Problem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
+from typing import Optional, Callable
 
 class PyMooFunction(Problem):
     '''
@@ -25,18 +26,19 @@ class PyMooFunction(Problem):
         self.count += 1
         out["F"] = self.func(x_).numpy()
 
-def nsga2(problem, ngen=100, pop_size=100, seed=2436, callback=None):
+def nsga2(problem: Problem, ngen: int=100, pop_size: int=100, seed: int=2436, callback: Optional[Callable]=None):
     """
     Perform NSGA-II optimization.
 
     Parameters:
-        problem: Optimization problem object.
-        ngen: Number of generations.
-        pop_size: Population size.
-        seed: Random seed for optimization.
+        problem (pymoo.core.Problem): Optimization problem object.
+        ngen (int): Number of generations.
+        pop_size (int): Population size.
+        seed (int): Random seed for optimization.
+        callback (Optional[Callable]): Optional callback function.
 
     Returns:
-        Optimization result.
+        res (pymoo.core.result.Result): Optimization result.
     """
     algorithm = NSGA2(pop_size=pop_size)
     if callback:

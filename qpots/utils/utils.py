@@ -1,4 +1,5 @@
 import torch
+from torch import Tensor
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.hypervolume import Hypervolume
@@ -6,9 +7,12 @@ from botorch.utils.multi_objective.pareto import is_non_dominated
 from sklearn.neighbors import KernelDensity
 from scipy.spatial.distance import cdist
 import argparse
+from typing import Tuple
+from qpots.model_object import ModelObject
+import numpy as np
 
 
-def unstandardize(Y, train_y):
+def unstandardize(Y: Tensor, train_y: Tensor) -> Tensor:
     """
     Reverse the standardization process for the output Y using the mean and standard deviation
     from the training data.
@@ -24,7 +28,7 @@ def unstandardize(Y, train_y):
     std = train_y.std(dim=0)
     return Y * std + mean
 
-def expected_hypervolume(gps, ref_point=torch.tensor([-300., -18.]), min=False):
+def expected_hypervolume(gps: ModelObject, ref_point: Tensor=torch.tensor([-300., -18.]), min: bool=False) -> Tuple:
     """
     Compute the expected hypervolume and Pareto front based on the GP model predictions.
 
@@ -61,12 +65,12 @@ def expected_hypervolume(gps, ref_point=torch.tensor([-300., -18.]), min=False):
             bd1 = FastNondominatedPartitioning(ref_point.double(), gps.train_y[..., :gps.nobj].double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
 
-def gen_filtered_cands(gps, cands, ref_point=torch.tensor([0., 0.]), kernel_bandwidth=0.05):
+def gen_filtered_cands(gps: ModelObject, cands: Tensor, ref_point: Tensor=torch.tensor([0., 0.]), kernel_bandwidth: float=0.05) -> Tensor:
     """
     Generate filtered candidate points based on the current Pareto front using Kernel Density Estimation (KDE).
 
     Parameters:
-        gps: The multi-objective GP models.
+        gps (ModelObject): The multi-objective GP models.
         cands (torch.Tensor): Candidate points to filter.
         ref_point (torch.Tensor): Reference point for the Pareto front.
         kernel_bandwidth (float): Bandwidth for the KDE filter.
@@ -93,15 +97,16 @@ def gen_filtered_cands(gps, cands, ref_point=torch.tensor([0., 0.]), kernel_band
     
     return cands_fil
     
-def select_candidates(gps, pareto_set, device, q=1, seed=None):
+def select_candidates(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int=1, seed: int=None):
         """
         Select candidates from the Pareto set.
 
         Parameters:
-            gps: Gaussian Process models.
-            pareto_set: Pareto optimal set of solutions.
-            k: Number of samples to select.
-            seed: Random seed for sampling.
+            gps (ModelObject): Gaussian Process models.
+            pareto_set (numpy.ndarray): Pareto optimal set of solutions.
+            device (torch.device): Device to run the candidates on.
+            q (int): The size of the batch.
+            seed (int): Random seed for sampling.
 
         Returns:
             torch.Tensor: Selected candidates.
