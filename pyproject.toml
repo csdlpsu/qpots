@@ -2,6 +2,9 @@
 requires = ["setuptools>=61.0", "botorch>=0.12.0", "torch>=2.4.1", "gpytorch>=1.13", "numpy>=1.25.2", "scipy>=1.11.4", "pymoo>=0.6.1.1"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
+
 [project]
 name = "qPOTS"
 version = "1.0.3"
