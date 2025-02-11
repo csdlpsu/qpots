@@ -1,4 +1,12 @@
-import matlab.engine
+try:
+    import matlab.engine
+    MATLAB_AVAILABLE = True
+except ImportError:
+    MATLAB_AVAILABLE = False
+
+if not MATLAB_AVAILABLE:
+    print("MATLAB engine is not available. Some features may be disabled.")
+
 import numpy as np
 import torch
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
