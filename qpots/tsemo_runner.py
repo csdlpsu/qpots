@@ -8,6 +8,7 @@ if not MATLAB_AVAILABLE:
     print("MATLAB engine is not available. Some features may be disabled.")
 
 import numpy as np
+import os
 import torch
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 
@@ -33,14 +34,27 @@ class TSEMORunner:
         self._batch_number = batch_number
         self._eng = matlab.engine.start_matlab()
 
-        # Add paths to MATLAB environment
-        self._eng.addpath(r'./TS-EMO', nargout=0)
-        self._eng.addpath(r'./TS-EMO/Test_functions', nargout=0)
-        self._eng.addpath(r'./TS-EMO/Direct', nargout=0)
-        self._eng.addpath(r'./TS-EMO/Mex_files/invchol', nargout=0)
-        self._eng.addpath(r'./TS-EMO/Mex_files/hypervolume', nargout=0)
-        self._eng.addpath(r'./TS-EMO/Mex_files/pareto front', nargout=0)
-        self._eng.addpath(r'./TS-EMO/NGPM_v1.4', nargout=0)
+        # Get the directory of the current script (which is inside qpots)
+        qpots_dir = os.path.dirname(os.path.abspath(__file__))
+        ts_emo_dir = os.path.join(qpots_dir, "TS-EMO")
+
+        # Define TS-EMO subdirectories
+        ts_emo_paths = [
+            ts_emo_dir,
+            os.path.join(ts_emo_dir, "Test_functions"),
+            os.path.join(ts_emo_dir, "Direct"),
+            os.path.join(ts_emo_dir, "Mex_files/invchol"),
+            os.path.join(ts_emo_dir, "Mex_files/hypervolume"),
+            os.path.join(ts_emo_dir, "Mex_files/pareto front"),
+            os.path.join(ts_emo_dir, "NGPM_v1.4")
+        ]
+
+        # Add paths to MATLAB
+        for path in ts_emo_paths:
+            if os.path.exists(path):  # Ensure path exists before adding
+                self._eng.addpath(path, nargout=0)
+            else:
+                print(f"Warning: The path {path} does not exist.")
 
     def tsemo_run(self, save_dir, rep):
         """

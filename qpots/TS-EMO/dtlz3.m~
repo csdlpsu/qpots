@@ -1,0 +1,3 @@
+function y = dtlz3(x)
+  dim = size(x,2)
+  

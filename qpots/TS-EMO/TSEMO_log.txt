@@ -1,0 +1,1557 @@
+
+ TSEMO log file created on 11-Feb-2025 
+
+ This file shows the initial specifications of TSEMO and logs the output.
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ License information 
+
+ BSD 2-Clause License 
+
+ Copyright (c) 2017, Eric Bradford, Artur M. Schweidtmann and Alexei Lapkin
+ All rights reserved. 
+
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met: 
+
+ *Redistributions of source code must retain the above copyright notice, this   
+  list of conditions and the following disclaimer. 
+
+ *Redistributions in binary form must reproduce the above copyright notice,   
+  this list of conditions and the following disclaimer in the documentation   
+  and/or other materials provided with the distribution. 
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Problem specifications 
+
+ Function used:   branincurrin 
+
+ Number of inputs:   2
+ Number of outputs:  2 
+
+ Lower bounds of decision variables:
+      x1      x2
+  0.0000  0.0000
+ 
+ Upper bounds of decision variables:
+      x1      x2
+  1.0000  1.0000
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm options 
+
+ Maximum number of function evaluations:  50
+ Sample batch size:                       1
+ Number of algorithm iterations:          50 
+
+ Genetic algorithm population size:        100
+ Genetic algorithm number of generations:  100 
+
+                                               f1      f2
+ Number of spectral sampling points:         4000    4000
+ Type of matern function:                       1       1
+ Direct evaluations per input dimension:      200     200
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Initial data set 
+
+ Number of initial data points:  20 
+
+ Initial input data matrix:
+      x1      x2
+  0.0149  0.3858
+  0.2952  0.3337
+  0.8967  0.8641
+  0.6868  0.3451
+  0.6794  0.9992
+  0.7243  0.0922
+  0.2808  0.7101
+  0.0080  0.7713
+  0.8199  0.4697
+  0.3160  0.6545
+  0.2866  0.5232
+  0.4776  0.0025
+  0.3528  0.9135
+  0.3932  0.5674
+  0.6088  0.9104
+  0.9641  0.4970
+  0.8279  0.0424
+  0.1452  0.1710
+  0.2773  0.0451
+  0.5781  0.9246
+
+ Initial output data matrix:
+      f1      f2
+126.4003  3.3004
+ 21.8668 10.4072
+129.6993  4.5213
+ 31.2032  8.2517
+203.9899  4.2563
+ 18.8504 10.6146
+ 27.7866  6.8309
+ 39.3924  1.8288
+ 48.4688  6.8274
+ 30.8111  7.0651
+ 17.7816  8.2905
+ 14.3796 11.8693
+ 85.7204  5.4369
+ 30.6944  7.3454
+149.3789  4.6913
+ 24.8959  6.4768
+ 14.4945 10.4062
+ 81.0779 12.3715
+ 62.0102 13.5396
+145.0103  4.7002
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 1 
+
+ Predicted hypervolume improvement:    1.1264
+ Time taken:    4.2052 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0014  0.7213
+
+ Corresponding observation(s): 
+      f1      f2
+ 52.3295  1.5709
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  0.8110  1.4324
+         lambda2  0.8797  1.8187
+          sigmaf 61.6282  4.6797
+          sigman  0.1362  0.0084
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 2 
+
+ Predicted hypervolume improvement:    1.2245
+ Time taken:    3.3577 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.4341  0.5135
+
+ Corresponding observation(s): 
+      f1      f2
+ 25.1100  7.5914
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  0.8419  1.4813
+         lambda2  0.9841  2.0702
+          sigmaf 62.8326  4.4130
+          sigman  0.1346  0.0082
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 3 
+
+ Predicted hypervolume improvement:    0.5334
+ Time taken:    4.2893 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.3755  0.6906
+
+ Corresponding observation(s): 
+      f1      f2
+ 45.9814  6.5406
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  0.9145  1.5573
+         lambda2  1.0503  2.1928
+          sigmaf 62.9165  4.4311
+          sigman  0.1317  0.0080
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 4 
+
+ Predicted hypervolume improvement:    1.6553
+ Time taken:    3.4901 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.9022  0.3362
+
+ Corresponding observation(s): 
+      f1      f2
+ 14.3308  7.9590
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  0.9689  1.6283
+         lambda2  1.1206  2.3420
+          sigmaf 64.2159  4.4494
+          sigman  0.1311  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 5 
+
+ Predicted hypervolume improvement:    1.0813
+ Time taken:    3.3998 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.4681  0.6381
+
+ Corresponding observation(s): 
+      f1      f2
+ 45.0194  6.4850
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.0231  1.7061
+         lambda2  1.2298  2.5309
+          sigmaf 64.2479  4.4825
+          sigman  0.1286  0.0077
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 6 
+
+ Predicted hypervolume improvement:    1.3008
+ Time taken:    3.4861 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.2068  0.7218
+
+ Corresponding observation(s): 
+      f1      f2
+  8.7195  6.8914
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.0930  1.7794
+         lambda2  1.2763  2.6363
+          sigmaf 65.7441  4.4760
+          sigman  0.1283  0.0076
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 7 
+
+ Predicted hypervolume improvement:    1.7439
+ Time taken:    3.9107 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0231  0.7499
+
+ Corresponding observation(s): 
+      f1      f2
+ 34.0135  2.6125
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.1165  1.7296
+         lambda2  1.2673  2.8382
+          sigmaf 65.9718  4.7383
+          sigman  0.1264  0.0077
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 8 
+
+ Predicted hypervolume improvement:    0.4450
+ Time taken:    3.6577 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0443  0.7502
+
+ Corresponding observation(s): 
+      f1      f2
+ 23.0892  3.5983
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.1717  1.7504
+         lambda2  1.3158  2.9268
+          sigmaf 66.9274  4.6754
+          sigman  0.1250  0.0078
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 9 
+
+ Predicted hypervolume improvement:    0.5350
+ Time taken:    4.0493 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.2568  0.5469
+
+ Corresponding observation(s): 
+      f1      f2
+ 13.9816  8.1920
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.2250  1.7545
+         lambda2  1.3461  2.9946
+          sigmaf 67.9130  4.5943
+          sigman  0.1242  0.0076
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 10 
+
+ Predicted hypervolume improvement:    0.5720
+ Time taken:    3.7105 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0038  0.7352
+
+ Corresponding observation(s): 
+      f1      f2
+ 48.1104  1.6773
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.2769  1.8240
+         lambda2  1.4326  3.2281
+          sigmaf 67.9013  4.8467
+          sigman  0.1221  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 11 
+
+ Predicted hypervolume improvement:    0.5487
+ Time taken:    4.2732 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0097  0.6765
+
+ Corresponding observation(s): 
+      f1      f2
+ 55.1912  2.0954
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3125  1.8796
+         lambda2  1.5194  3.5013
+          sigmaf 68.0836  4.8192
+          sigman  0.1200  0.0080
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 12 
+
+ Predicted hypervolume improvement:    0.4200
+ Time taken:    3.5412 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0550  0.8226
+
+ Corresponding observation(s): 
+      f1      f2
+ 11.6196  3.7947
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3354  1.9327
+         lambda2  1.6093  3.8281
+          sigmaf 68.9649  4.7581
+          sigman  0.1195  0.0080
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 13 
+
+ Predicted hypervolume improvement:    0.4480
+ Time taken:    4.0382 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0512  0.8444
+
+ Corresponding observation(s): 
+      f1      f2
+ 11.2392  3.5785
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.2446  1.9315
+         lambda2  1.6467  3.9851
+          sigmaf 68.2784  4.7412
+          sigman  0.1190  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 14 
+
+ Predicted hypervolume improvement:    0.3524
+ Time taken:    4.2319 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0703  0.8011
+
+ Corresponding observation(s): 
+      f1      f2
+  8.5152  4.4260
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.2530  1.9901
+         lambda2  1.7294  4.2813
+          sigmaf 68.3930  4.7453
+          sigman  0.1186  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 15 
+
+ Predicted hypervolume improvement:    0.3921
+ Time taken:    4.3829 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0133  0.8529
+
+ Corresponding observation(s): 
+      f1      f2
+ 25.4643  1.9413
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3084  2.0394
+         lambda2  1.8024  4.3595
+          sigmaf 68.3638  4.8466
+          sigman  0.1173  0.0080
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 16 
+
+ Predicted hypervolume improvement:    0.9488
+ Time taken:    4.2031 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1043  0.8367
+
+ Corresponding observation(s): 
+      f1      f2
+  1.0017  5.2232
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3540  2.1470
+         lambda2  1.8543  4.9381
+          sigmaf 69.1541  4.8734
+          sigman  0.1173  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 17 
+
+ Predicted hypervolume improvement:    0.1553
+ Time taken:    3.9210 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0790  0.8514
+
+ Corresponding observation(s): 
+      f1      f2
+  3.8886  4.5056
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3840  2.1649
+         lambda2  1.9043  4.9807
+          sigmaf 69.2962  4.8590
+          sigman  0.1170  0.0078
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 18 
+
+ Predicted hypervolume improvement:    0.1856
+ Time taken:    3.2665 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0124  0.8895
+
+ Corresponding observation(s): 
+      f1      f2
+ 21.9600  1.8411
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.4374  2.2220
+         lambda2  1.9691  5.0841
+          sigmaf 69.0444  4.9512
+          sigman  0.1159  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 19 
+
+ Predicted hypervolume improvement:    0.4043
+ Time taken:    3.5431 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0265  0.9469
+
+ Corresponding observation(s): 
+      f1      f2
+ 12.4059  2.3419
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.4428  2.3103
+         lambda2  2.0308  5.5783
+          sigmaf 68.9897  5.0088
+          sigman  0.1151  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 20 
+
+ Predicted hypervolume improvement:    0.2288
+ Time taken:    3.5387 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0292  0.8295
+
+ Corresponding observation(s): 
+      f1      f2
+ 20.8597  2.7044
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.3939  2.3671
+         lambda2  2.0753  5.8800
+          sigmaf 68.1075  5.0110
+          sigman  0.1140  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 21 
+
+ Predicted hypervolume improvement:    0.2441
+ Time taken:    3.3788 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0463  0.9134
+
+ Corresponding observation(s): 
+      f1      f2
+  8.5794  3.1957
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.4391  2.4311
+         lambda2  2.1318  5.9765
+          sigmaf 68.4978  4.9798
+          sigman  0.1135  0.0079
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 22 
+
+ Predicted hypervolume improvement:    0.4125
+ Time taken:    3.4170 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0741  0.8797
+
+ Corresponding observation(s): 
+      f1      f2
+  3.8506  4.2519
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.4794  2.4830
+         lambda2  2.2135  6.2079
+          sigmaf 68.9003  4.9635
+          sigman  0.1131  0.0078
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 23 
+
+ Predicted hypervolume improvement:    0.3077
+ Time taken:    3.3206 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0473  0.9080
+
+ Corresponding observation(s): 
+      f1      f2
+  8.5906  3.2460
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.5189  2.5368
+         lambda2  2.3022  6.4298
+          sigmaf 69.0166  4.9945
+          sigman  0.1125  0.0078
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 24 
+
+ Predicted hypervolume improvement:    0.3497
+ Time taken:    3.4401 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0353  0.9638
+
+ Corresponding observation(s): 
+      f1      f2
+  9.2312  2.6575
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.5560  2.5926
+         lambda2  2.3935  6.7050
+          sigmaf 69.2196  5.0277
+          sigman  0.1119  0.0078
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 25 
+
+ Predicted hypervolume improvement:    0.1623
+ Time taken:    3.4641 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0657  0.9208
+
+ Corresponding observation(s): 
+      f1      f2
+  4.2567  3.8520
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.5663  2.6447
+         lambda2  2.4629  6.9034
+          sigmaf 69.2750  4.9934
+          sigman  0.1114  0.0077
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 26 
+
+ Predicted hypervolume improvement:    0.0825
+ Time taken:    3.6226 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0647  0.8962
+
+ Corresponding observation(s): 
+      f1      f2
+  5.0710  3.8977
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.6083  2.6962
+         lambda2  2.5322  7.0692
+          sigmaf 69.4018  4.9892
+          sigman  0.1109  0.0076
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 27 
+
+ Predicted hypervolume improvement:    0.0615
+ Time taken:    3.7853 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0159  0.9463
+
+ Corresponding observation(s): 
+      f1      f2
+ 15.8139  1.9061
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.6502  2.7532
+         lambda2  2.6105  7.2626
+          sigmaf 69.3324  5.0511
+          sigman  0.1101  0.0077
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 28 
+
+ Predicted hypervolume improvement:    0.0864
+ Time taken:    4.2051 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0845  0.9451
+
+ Corresponding observation(s): 
+      f1      f2
+  2.2189  4.3135
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.6975  2.8289
+         lambda2  2.6541  7.4795
+          sigmaf 69.6428  5.0051
+          sigman  0.1097  0.0076
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 29 
+
+ Predicted hypervolume improvement:    0.0969
+ Time taken:    4.2290 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0776  0.9236
+
+ Corresponding observation(s): 
+      f1      f2
+  2.6423  4.2023
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.7233  2.8620
+         lambda2  2.7174  7.6343
+          sigmaf 69.6577  4.9972
+          sigman  0.1093  0.0075
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 30 
+
+ Predicted hypervolume improvement:    0.1920
+ Time taken:    4.2517 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0452  0.9451
+
+ Corresponding observation(s): 
+      f1      f2
+  7.5883  3.0734
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.7687  2.9190
+         lambda2  2.7861  7.7880
+          sigmaf 69.6701  5.0159
+          sigman  0.1087  0.0075
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 31 
+
+ Predicted hypervolume improvement:    0.0805
+ Time taken:    3.7319 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1183  0.8591
+
+ Corresponding observation(s): 
+      f1      f2
+  0.5991  5.3949
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.8105  2.9759
+         lambda2  2.8551  7.9782
+          sigmaf 69.9360  4.9878
+          sigman  0.1083  0.0074
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 32 
+
+ Predicted hypervolume improvement:    0.0826
+ Time taken:    3.6700 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0537  0.9566
+
+ Corresponding observation(s): 
+      f1      f2
+  5.6130  3.3455
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.8561  3.0282
+         lambda2  2.9207  8.0472
+          sigmaf 69.9466  4.9956
+          sigman  0.1078  0.0074
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 33 
+
+ Predicted hypervolume improvement:    0.0789
+ Time taken:    3.6103 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0638  0.9383
+
+ Corresponding observation(s): 
+      f1      f2
+  4.2624  3.7356
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.9002  3.0842
+         lambda2  2.9763  8.1544
+          sigmaf 70.0266  4.9780
+          sigman  0.1073  0.0073
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 34 
+
+ Predicted hypervolume improvement:    0.1687
+ Time taken:    3.8885 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0386  1.0000
+
+ Corresponding observation(s): 
+      f1      f2
+  7.5507  2.7061
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.9409  3.1392
+         lambda2  3.0506  8.3559
+          sigmaf 70.0653  5.0036
+          sigman  0.1067  0.0073
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 35 
+
+ Predicted hypervolume improvement:    0.0492
+ Time taken:    3.8373 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0131  0.9830
+
+ Corresponding observation(s): 
+      f1      f2
+ 14.4235  1.7354
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.9235  3.1924
+         lambda2  3.1101  8.6836
+          sigmaf 69.6134  5.0517
+          sigman  0.1059  0.0073
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 36 
+
+ Predicted hypervolume improvement:    0.1155
+ Time taken:    3.7471 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0978  0.9545
+
+ Corresponding observation(s): 
+      f1      f2
+  2.2959  4.5978
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.9588  3.2755
+         lambda2  3.1621  9.0842
+          sigmaf 69.7839  5.0373
+          sigman  0.1055  0.0073
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 37 
+
+ Predicted hypervolume improvement:    0.1197
+ Time taken:    3.5706 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0373  0.9808
+
+ Corresponding observation(s): 
+      f1      f2
+  8.2326  2.6975
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  1.9979  3.3208
+         lambda2  3.2145  9.1708
+          sigmaf 69.6805  5.0535
+          sigman  0.1048  0.0073
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 38 
+
+ Predicted hypervolume improvement:    0.0589
+ Time taken:    3.5877 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1261  0.8074
+
+ Corresponding observation(s): 
+      f1      f2
+  0.4104  5.7772
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.0279  3.3741
+         lambda2  3.3015  9.4755
+          sigmaf 69.9232  5.0375
+          sigman  0.1045  0.0072
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 39 
+
+ Predicted hypervolume improvement:    0.0465
+ Time taken:    3.5861 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0761  0.9976
+
+ Corresponding observation(s): 
+      f1      f2
+  3.5702  3.9220
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.0698  3.4229
+         lambda2  3.3661  9.7047
+          sigmaf 70.0017  5.0486
+          sigman  0.1040  0.0072
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 40 
+
+ Predicted hypervolume improvement:    0.0939
+ Time taken:    3.5832 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1812  0.7631
+
+ Corresponding observation(s): 
+      f1      f2
+  5.0391  6.5620
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.0921  3.4598
+         lambda2  3.4289  9.9080
+          sigmaf 69.9287  5.0489
+          sigman  0.1035  0.0071
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 41 
+
+ Predicted hypervolume improvement:    0.0380
+ Time taken:    3.5975 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0444  0.9712
+
+ Corresponding observation(s): 
+      f1      f2
+  7.0290  2.9800
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.1332  3.5121
+         lambda2  3.4864  9.9863
+          sigmaf 69.9610  5.0498
+          sigman  0.1029  0.0071
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 42 
+
+ Predicted hypervolume improvement:    0.0399
+ Time taken:    3.5806 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0949  0.8664
+
+ Corresponding observation(s): 
+      f1      f2
+  1.4152  4.8746
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.1740  3.5683
+         lambda2  3.5418 10.1241
+          sigmaf 70.0766  5.0211
+          sigman  0.1025  0.0070
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 43 
+
+ Predicted hypervolume improvement:    0.0093
+ Time taken:    3.6123 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0226  0.9965
+
+ Corresponding observation(s): 
+      f1      f2
+ 11.1310  2.1006
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.2180  3.6220
+         lambda2  3.5979 10.2504
+          sigmaf 69.9583  5.0597
+          sigman  0.1018  0.0070
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 44 
+
+ Predicted hypervolume improvement:    0.0099
+ Time taken:    3.5714 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1119  0.8764
+
+ Corresponding observation(s): 
+      f1      f2
+  0.7424  5.2001
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.2552  3.6811
+         lambda2  3.6429 10.3450
+          sigmaf 70.0733  5.0058
+          sigman  0.1015  0.0070
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 45 
+
+ Predicted hypervolume improvement:    0.0055
+ Time taken:    3.5817 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0060  1.0000
+
+ Corresponding observation(s): 
+      f1      f2
+ 15.5974  1.4268
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.2926  3.7329
+         lambda2  3.7163 10.5112
+          sigmaf 69.9293  5.0684
+          sigman  0.1008  0.0070
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 46 
+
+ Predicted hypervolume improvement:    0.0108
+ Time taken:    3.6400 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1560  0.8070
+
+ Corresponding observation(s): 
+      f1      f2
+  2.4107  6.1444
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.3234  3.8272
+         lambda2  3.7571 10.8504
+          sigmaf 69.9870  5.0523
+          sigman  0.1003  0.0070
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 47 
+
+ Predicted hypervolume improvement:    0.0429
+ Time taken:    3.5411 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1451  0.9941
+
+ Corresponding observation(s): 
+      f1      f2
+ 12.3655  5.1667
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.3671  3.8805
+         lambda2  3.8085 10.8995
+          sigmaf 69.8662  5.0318
+          sigman  0.0997  0.0069
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 48 
+
+ Predicted hypervolume improvement:    0.0052
+ Time taken:    3.6061 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.0622  0.9888
+
+ Corresponding observation(s): 
+      f1      f2
+  4.2770  3.5381
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.3943  3.8972
+         lambda2  3.8481 10.9867
+          sigmaf 69.8372  5.0241
+          sigman  0.0992  0.0069
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 49 
+
+ Predicted hypervolume improvement:    0.0083
+ Time taken:    3.6501 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1250  0.7800
+
+ Corresponding observation(s): 
+      f1      f2
+  0.6865  5.9047
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.4374  3.9513
+         lambda2  3.8957 11.0911
+          sigmaf 69.8989  5.0092
+          sigman  0.0989  0.0068
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Algorithm iteration 50 
+
+ Predicted hypervolume improvement:    0.0152
+ Time taken:    3.6354 
+
+ Proposed evaluation point(s): 
+      x1      x2
+  0.1214  0.8119
+
+ Corresponding observation(s): 
+      f1      f2
+  0.4401  5.6763
+
+ Current hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.4703  3.9958
+         lambda2  3.9710 11.4238
+          sigmaf 70.0107  5.0210
+          sigman  0.0985  0.0068
+
+ ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ Final algorithm output 
+
+ Final input data matrix:
+      x1      x2
+  0.0149  0.3858
+  0.2952  0.3337
+  0.8967  0.8641
+  0.6868  0.3451
+  0.6794  0.9992
+  0.7243  0.0922
+  0.2808  0.7101
+  0.0080  0.7713
+  0.8199  0.4697
+  0.3160  0.6545
+  0.2866  0.5232
+  0.4776  0.0025
+  0.3528  0.9135
+  0.3932  0.5674
+  0.6088  0.9104
+  0.9641  0.4970
+  0.8279  0.0424
+  0.1452  0.1710
+  0.2773  0.0451
+  0.5781  0.9246
+  0.0014  0.7213
+  0.4341  0.5135
+  0.3755  0.6906
+  0.9022  0.3362
+  0.4681  0.6381
+  0.2068  0.7218
+  0.0231  0.7499
+  0.0443  0.7502
+  0.2568  0.5469
+  0.0038  0.7352
+  0.0097  0.6765
+  0.0550  0.8226
+  0.0512  0.8444
+  0.0703  0.8011
+  0.0133  0.8529
+  0.1043  0.8367
+  0.0790  0.8514
+  0.0124  0.8895
+  0.0265  0.9469
+  0.0292  0.8295
+  0.0463  0.9134
+  0.0741  0.8797
+  0.0473  0.9080
+  0.0353  0.9638
+  0.0657  0.9208
+  0.0647  0.8962
+  0.0159  0.9463
+  0.0845  0.9451
+  0.0776  0.9236
+  0.0452  0.9451
+  0.1183  0.8591
+  0.0537  0.9566
+  0.0638  0.9383
+  0.0386  1.0000
+  0.0131  0.9830
+  0.0978  0.9545
+  0.0373  0.9808
+  0.1261  0.8074
+  0.0761  0.9976
+  0.1812  0.7631
+  0.0444  0.9712
+  0.0949  0.8664
+  0.0226  0.9965
+  0.1119  0.8764
+  0.0060  1.0000
+  0.1560  0.8070
+  0.1451  0.9941
+  0.0622  0.9888
+  0.1250  0.7800
+  0.1214  0.8119
+
+ Final output data matrix:
+      f1      f2
+126.4003  3.3004
+ 21.8668 10.4072
+129.6993  4.5213
+ 31.2032  8.2517
+203.9899  4.2563
+ 18.8504 10.6146
+ 27.7866  6.8309
+ 39.3924  1.8288
+ 48.4688  6.8274
+ 30.8111  7.0651
+ 17.7816  8.2905
+ 14.3796 11.8693
+ 85.7204  5.4369
+ 30.6944  7.3454
+149.3789  4.6913
+ 24.8959  6.4768
+ 14.4945 10.4062
+ 81.0779 12.3715
+ 62.0102 13.5396
+145.0103  4.7002
+ 52.3295  1.5709
+ 25.1100  7.5914
+ 45.9814  6.5406
+ 14.3308  7.9590
+ 45.0194  6.4850
+  8.7195  6.8914
+ 34.0135  2.6125
+ 23.0892  3.5983
+ 13.9816  8.1920
+ 48.1104  1.6773
+ 55.1912  2.0954
+ 11.6196  3.7947
+ 11.2392  3.5785
+  8.5152  4.4260
+ 25.4643  1.9413
+  1.0017  5.2232
+  3.8886  4.5056
+ 21.9600  1.8411
+ 12.4059  2.3419
+ 20.8597  2.7044
+  8.5794  3.1957
+  3.8506  4.2519
+  8.5906  3.2460
+  9.2312  2.6575
+  4.2567  3.8520
+  5.0710  3.8977
+ 15.8139  1.9061
+  2.2189  4.3135
+  2.6423  4.2023
+  7.5883  3.0734
+  0.5991  5.3949
+  5.6130  3.3455
+  4.2624  3.7356
+  7.5507  2.7061
+ 14.4235  1.7354
+  2.2959  4.5978
+  8.2326  2.6975
+  0.4104  5.7772
+  3.5702  3.9220
+  5.0391  6.5620
+  7.0290  2.9800
+  1.4152  4.8746
+ 11.1310  2.1006
+  0.7424  5.2001
+ 15.5974  1.4268
+  2.4107  6.1444
+ 12.3655  5.1667
+  4.2770  3.5381
+  0.6865  5.9047
+  0.4401  5.6763
+
+ Input data matrix of corresponding Pareto front:
+      x1      x2
+  0.0353  0.9638
+  0.0657  0.9208
+  0.0845  0.9451
+  0.0776  0.9236
+  0.1183  0.8591
+  0.0537  0.9566
+  0.0638  0.9383
+  0.0386  1.0000
+  0.0131  0.9830
+  0.0373  0.9808
+  0.1261  0.8074
+  0.0761  0.9976
+  0.0444  0.9712
+  0.0949  0.8664
+  0.0226  0.9965
+  0.1119  0.8764
+  0.0060  1.0000
+  0.0622  0.9888
+  0.1214  0.8119
+
+ Output data matrix of corresponding Pareto front:
+      f1      f2
+  9.2312  2.6575
+  4.2567  3.8520
+  2.2189  4.3135
+  2.6423  4.2023
+  0.5991  5.3949
+  5.6130  3.3455
+  4.2624  3.7356
+  7.5507  2.7061
+ 14.4235  1.7354
+  8.2326  2.6975
+  0.4104  5.7772
+  3.5702  3.9220
+  7.0290  2.9800
+  1.4152  4.8746
+ 11.1310  2.1006
+  0.7424  5.2001
+ 15.5974  1.4268
+  4.2770  3.5381
+  0.4401  5.6763
+
+ Input data matrix of Pareto front of final Gaussian process model:
+      x1      x2
+  0.0000  1.0000
+  0.9738  0.0000
+  0.0000  1.0000
+  0.1280  0.8205
+  0.0056  1.0000
+  0.0079  1.0000
+  0.0164  1.0000
+  0.0948  0.9103
+  0.0223  1.0000
+  0.0146  1.0000
+  0.0627  0.9669
+  0.0195  1.0000
+  0.0026  1.0000
+  0.0953  0.8975
+  0.1224  0.8333
+  0.1061  0.8550
+  0.0247  1.0000
+  0.0351  1.0000
+  0.0649  0.9670
+  0.0177  1.0000
+  0.0183  1.0000
+  0.1016  0.8772
+  0.0720  0.9578
+  0.1193  0.8418
+  0.0009  1.0000
+  0.0205  1.0000
+  0.0914  0.9308
+  0.0429  1.0000
+  0.0301  1.0000
+  0.0415  1.0000
+  0.0760  0.9653
+  0.0088  1.0000
+  0.0704  0.9623
+  0.0458  1.0000
+  0.0514  0.9890
+  0.0872  0.9456
+  0.0382  1.0000
+  0.1097  0.8569
+  0.0967  0.8778
+  0.0766  0.9533
+  0.0106  1.0000
+  0.0631  0.9884
+  0.1015  0.8975
+  0.0681  0.9656
+  0.0898  0.9346
+  0.0114  1.0000
+  0.1049  0.8614
+  0.0838  0.9422
+  0.0874  0.9342
+  0.0366  1.0000
+  0.0339  1.0000
+  0.0402  1.0000
+  0.0768  0.9336
+  0.0474  1.0000
+  0.0549  0.9890
+  0.0129  1.0000
+  0.0544  1.0000
+  0.0308  1.0000
+  0.0938  0.9328
+  0.0807  0.9317
+  0.1122  0.8338
+  0.0267  1.0000
+  0.0589  0.9874
+  0.0044  1.0000
+  0.0096  1.0000
+  0.1135  0.8569
+  0.0259  1.0000
+  0.0038  1.0000
+  0.0671  0.9693
+  0.0287  1.0000
+  0.0364  1.0000
+  0.0786  0.9310
+  0.0742  0.9613
+  0.1231  0.8422
+  0.0604  0.9854
+  0.0612  0.9859
+  0.0100  1.0000
+  0.0330  1.0000
+  0.0567  1.0000
+  0.0393  1.0000
+  0.1015  0.8558
+  0.0442  1.0000
+  0.0136  1.0000
+  0.1011  0.8589
+  0.0739  0.9669
+  0.1104  0.8543
+  0.0276  1.0000
+  0.0278  1.0000
+  0.0593  1.0000
+  0.0204  1.0000
+  0.0229  1.0000
+  0.0236  1.0000
+  0.0318  1.0000
+  0.0665  0.9704
+  0.1142  0.8437
+  0.0141  1.0000
+  0.0576  1.0000
+  0.0512  1.0000
+  0.0286  0.9985
+  0.0936  0.9338
+
+ Output data matrix of Pareto front of final Gaussian process model:
+      f1      f2
+ 16.5787  1.1816
+-21.7077  9.2414
+ 16.5787  1.1816
+ -0.0005  5.7319
+ 15.7283  1.4014
+ 15.1944  1.4988
+ 12.7507  1.8519
+  1.4208  4.6838
+ 11.0766  2.0812
+ 13.1978  1.7768
+  4.0411  3.6202
+ 11.8482  1.9734
+ 16.2082  1.2822
+  1.3108  4.7515
+  0.0077  5.5802
+  0.7705  5.1875
+ 10.5383  2.1757
+  8.3302  2.5765
+  3.7458  3.6918
+ 12.3982  1.9028
+ 12.2145  1.9270
+  1.1250  4.9932
+  3.1660  3.9274
+  0.1599  5.4903
+ 16.4744  1.2143
+ 11.5406  2.0131
+  1.7152  4.5220
+  6.8949  2.8616
+  9.1686  2.3839
+  7.0708  2.8109
+  2.6328  4.0246
+ 14.9440  1.5338
+  3.3479  3.8691
+  6.4350  2.9679
+  5.6169  3.1858
+  2.2058  4.3786
+  7.6463  2.6906
+  0.5206  5.2505
+  1.3075  4.8692
+  2.5256  4.0765
+ 14.3295  1.6108
+  4.1860  3.5680
+  1.2522  4.9037
+  3.3695  3.7947
+  1.9279  4.4751
+ 14.0672  1.6440
+  0.9404  5.1378
+  2.2522  4.3022
+  1.9794  4.4165
+  8.0079  2.6330
+  8.5421  2.5298
+  7.2620  2.7624
+  2.3841  4.1360
+  6.1609  3.0252
+  5.1294  3.3035
+ 13.6211  1.7065
+  5.3989  3.2656
+  9.0234  2.4112
+  1.5286  4.5744
+  2.3232  4.2474
+  0.2506  5.3985
+ 10.0529  2.2528
+  4.5186  3.4366
+ 15.9280  1.3528
+ 14.6843  1.5670
+  0.3420  5.3189
+ 10.2479  2.2236
+ 16.0163  1.3303
+  3.5611  3.7525
+  9.4909  2.3328
+  8.0594  2.6247
+  2.3770  4.1918
+  2.9071  3.9806
+  0.1187  5.5498
+  4.3788  3.4886
+  4.3003  3.5120
+ 14.5535  1.5832
+  8.6717  2.4963
+  5.0014  3.3395
+  7.4093  2.7321
+  1.0018  5.0784
+  6.7034  2.9107
+ 13.4451  1.7345
+  1.0952  5.0566
+  2.9151  3.9610
+  0.4061  5.2755
+  9.8077  2.2878
+  9.7531  2.2954
+  4.7057  3.4225
+ 11.5755  2.0085
+ 10.9370  2.1048
+ 10.7702  2.1343
+  8.8388  2.4526
+  3.6648  3.7316
+  0.3262  5.3893
+ 13.3221  1.7552
+  4.8729  3.3677
+  5.7741  3.1576
+  9.5087  2.3304
+  1.5315  4.5691
+
+ Final hyperparameter values: 
+  Hyperparameter      f1      f2
+         lambda1  2.5127  4.0482
+         lambda2  4.0263 11.5087
+          sigmaf 70.2999  5.0449
+          sigman  0.0985  0.0068
