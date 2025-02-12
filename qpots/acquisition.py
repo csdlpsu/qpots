@@ -70,7 +70,7 @@ class Acquisition:
         self.nobj = gps.nobj
         self.ncons = gps.ncons
 
-    def nystrom_approx(
+    def _nystrom_approx(
         self,
         x: Tensor,
         gps: ModelListGP,
@@ -194,7 +194,7 @@ class Acquisition:
         pareto_set = [None]
 
         if kwargs["nystrom"] == 1:
-            gp_posterior_approx_ = lambda x: self.nystrom_approx(
+            gp_posterior_approx_ = lambda x: self._nystrom_approx(
                 x.to(self.device),
                 self.gps,
                 int(0.2 * kwargs["iters"]),
