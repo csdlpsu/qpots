@@ -1,7 +1,10 @@
 import torch
 import numpy as np
 import os
-import matlab.engine
+try:
+    import matlab.engine
+except ImportError:
+    print("Failed to import matlab engine")
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 
 
