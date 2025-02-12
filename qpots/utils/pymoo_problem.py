@@ -90,25 +90,6 @@ def nsga2(
     -------
     pymoo.core.result.Result
         The result of the optimization, containing the Pareto front and other relevant information.
-
-    Examples
-    --------
-    Define a simple multi-objective optimization problem and solve it using NSGA-II:
-
-    >>> from pymoo.core.problem import Problem
-    >>> import numpy as np
-    >>> class MyProblem(Problem):
-    ...     def __init__(self):
-    ...         super().__init__(n_var=2, n_obj=2, xl=0.0, xu=1.0)
-    ...     def _evaluate(self, x, out, *args, **kwargs):
-    ...         f1 = x[:, 0] ** 2
-    ...         f2 = (x[:, 1] - 1) ** 2
-    ...         out["F"] = np.column_stack([f1, f2])
-    ...
-    >>> problem = MyProblem()
-    >>> result = nsga2(problem, ngen=50, pop_size=50, seed=42)
-    >>> print(result.X)  # Optimized decision variables
-    >>> print(result.F)  # Corresponding objective values
     """
     algorithm = NSGA2(pop_size=pop_size)
 
