@@ -143,7 +143,7 @@ class Acquisition:
 
         return -Ys
 
-    def gp_posterior(self, x: Tensor, gps: ModelListGP, seed_iter: int = 1) -> Tensor:
+    def _gp_posterior(self, x: Tensor, gps: ModelListGP, seed_iter: int = 1) -> Tensor:
         """
         Compute posterior samples for PyMoo optimization.
 
