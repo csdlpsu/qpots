@@ -21,8 +21,8 @@ qPOTS Documentation
    qpots_utils_utils
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Examples
 
-   examples
+   constrained_example
 
