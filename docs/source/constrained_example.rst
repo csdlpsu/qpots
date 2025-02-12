@@ -16,7 +16,7 @@ Overview
 Script Details
 --------------
 
-.. literalinclude:: ../../qpots/examples/constrained_optimization.py
+.. literalinclude:: https://github.com/csdlpsu/qpots/blob/main/examples/constrained_problem.py
    :language: python
    :linenos:
    :caption: constrained_optimization.py
@@ -62,7 +62,7 @@ Run the script using:
 
 .. code-block:: sh
 
-   python constrained_optimization.py
+   python constrained_example.py
 
 Ensure that dependencies such as **BoTorch**, **PyTorch**, and **PyMoo** are installed.
 
