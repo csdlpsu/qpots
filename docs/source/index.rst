@@ -25,4 +25,5 @@ qPOTS Documentation
    :caption: Examples
 
    constrained_example
+   unconstrained_example
 
