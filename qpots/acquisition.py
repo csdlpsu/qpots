@@ -51,14 +51,29 @@ class Acquisition:
         """
         Initialize the multi-objective acquisition class.
 
-        Parameters:
-            func (Function): The test function being optimized.
-            gps (ModelListGP): Gaussian Process models.
-            cons (Optional[Callable]): A vector-valued function of inequality constraints.
-            device (torch.device): Device for computation (CPU/GPU).
-            q (int, optional): Number of points to sample per iteration. Defaults to 1.
-            NUM_RESTARTS (int, optional): Number of restarts for acquisition optimization.
-            RAW_SAMPLES (int, optional): Number of raw samples for acquisition optimization.
+        This class provides various acquisition functions for multi-objective Bayesian 
+        optimization. It supports Gaussian Process models and handles inequality constraints 
+        if provided.
+
+        Parameters
+        ----------
+        func : Function
+            The test function being optimized.
+        gps : ModelListGP
+            A list of Gaussian Process models used for Bayesian optimization.
+        cons : Optional[Callable], optional
+            A vector-valued function representing inequality constraints. If provided, 
+            the acquisition function will account for feasibility constraints.
+        device : torch.device, optional
+            The computational device to use (CPU or GPU). Defaults to ``torch.device("cpu")``.
+        q : int, optional
+            The number of candidate points to sample per iteration. Defaults to 1.
+        NUM_RESTARTS : int, optional
+            The number of restarts for optimizing the acquisition function. 
+            A higher value can improve optimization quality. Defaults to 10.
+        RAW_SAMPLES : int, optional
+            The number of raw samples used in acquisition optimization. 
+            Higher values increase exploration but may slow computation. Defaults to 512.
         """
         self.func = func
         self.gps = gps
@@ -69,6 +84,7 @@ class Acquisition:
         self.RAW_SAMPLES = RAW_SAMPLES
         self.nobj = gps.nobj
         self.ncons = gps.ncons
+
 
     def _nystrom_approx(
         self,
@@ -81,19 +97,40 @@ class Acquisition:
         reg: float = 1e-6,
     ) -> Tensor:
         """
-        Perform Thompson sampling using the Nystrom approximation for GP models.
+        Perform Thompson sampling using the Nyström approximation for Gaussian Process (GP) models.
 
-        Parameters:
-            x (Tensor): Input points.
-            gps (ModelListGP): A list of GP models.
-            m (int): Number of landmarks for the Nystrom approximation.
-            pareto_set (Optional[Tensor]): Pareto optimal points. Required if `col_choice` is 'pareto'.
-            col_choice (str, optional): Column selection method ('pareto' or 'random'). Defaults to 'pareto'.
-            seed_iter (int, optional): Seed iteration for randomness. Defaults to 1.
-            reg (float, optional): Regularization constant for matrix inversion. Defaults to 1e-6.
+        The Nyström approximation is a method for approximating large covariance matrices
+        in Gaussian Process inference, improving computational efficiency while preserving 
+        accuracy. This function selects a subset of columns to approximate the full covariance 
+        matrix and then performs posterior sampling.
 
-        Returns:
-            Tensor: Posterior samples from the GP models.
+        Parameters
+        ----------
+        x : Tensor
+            A tensor of input points for which posterior samples are computed.
+        gps : ModelListGP
+            A list of Gaussian Process models used to estimate the posterior distribution.
+        m : int
+            The number of landmarks (subset size) used in the Nyström approximation.
+        pareto_set : Optional[Tensor], optional
+            A tensor containing Pareto optimal points. Required if ``col_choice`` is 'pareto'. 
+            Defaults to None.
+        col_choice : str, optional
+            The column selection strategy for the Nyström approximation. 
+            Options:
+            - 'pareto' (default): Select columns based on proximity to Pareto optimal points.
+            - 'random': Select a random subset of columns.
+        seed_iter : int, optional
+            An iteration index for seeding randomness in sampling. Defaults to 1.
+        reg : float, optional
+            A small regularization constant added to the covariance matrix for numerical 
+            stability during matrix inversion. Defaults to 1e-6.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing posterior samples from the GP models. Infeasible points 
+            are penalized if constraints exist.
         """
         torch.manual_seed(1024 + seed_iter)
         samples_list = []
@@ -143,17 +180,25 @@ class Acquisition:
 
         return -Ys
 
+
     def _gp_posterior(self, x: Tensor, gps: ModelListGP, seed_iter: int = 1) -> Tensor:
         """
         Compute posterior samples for PyMoo optimization.
 
-        Parameters:
-            x (Tensor): Input points.
-            gps (ModelListGP): Gaussian Process models.
-            seed_iter (int, optional): Iteration index for seeding randomness. Defaults to 1.
+        Parameters
+        ----------
+        x : Tensor
+            A tensor of input points for which posterior samples are computed.
+        gps : ModelListGP
+            A list of Gaussian Process models used to estimate the posterior distribution.
+        seed_iter : int, optional
+            An iteration index for seeding randomness in sampling. Defaults to 1.
 
-        Returns:
-            Tensor: Posterior samples.
+        Returns
+        -------
+        Tensor
+            A tensor containing posterior samples from the GP models, with
+            infeasible points penalized if constraints exist.
         """
         torch.manual_seed(1024 + seed_iter)
         Ys_ = [
@@ -163,14 +208,13 @@ class Acquisition:
 
         if self.ncons > 0:
             ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
-            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12
+            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
 
         return -Ys
 
-    
     def qpots(
         self,
         bounds: Tensor,
@@ -178,15 +222,30 @@ class Acquisition:
         **kwargs,
     ) -> Tensor:
         """
-        Perform Pareto Optimal Thompson Sampling (QPOTS).
+        Perform Pareto Optimal Thompson Sampling (qPOTS).
 
-        Parameters:
-            bounds (Tensor): The bounds for the optimization problem.
-            iteration (int): Current iteration index for seeding randomness.
-            **kwargs: Additional arguments for customization.
+        Parameters
+        ----------
+        bounds : Tensor
+            A tensor representing the lower and upper bounds for the 
+            optimization problem.
+        iteration : int
+            The current iteration index, used for seeding randomness.
+        **kwargs : dict
+            Additional arguments for customization, including:
+            
+            - ``nystrom`` (int): Whether to use the Nystrom approximation (1 for yes, 0 for no).
+            - ``iters`` (int): Number of iterations for approximation.
+            - ``nychoice`` (str): Column selection method for the Nystrom approximation.
+            - ``dim`` (int): Dimensionality of the problem.
+            - ``ngen`` (int): Number of generations for NSGA-II optimization.
+            - ``q`` (int): Number of candidates to select.
 
-        Returns:
-            Tensor: Selected candidates.
+        Returns
+        -------
+        Tensor
+            A tensor containing the selected candidate points after Pareto Optimal 
+            Thompson Sampling.
         """
         def track_pareto(res):
             pareto_set[0] = res.opt.get("X")
@@ -243,13 +302,19 @@ class Acquisition:
 
     def qlogei(self, ref_point: Tensor = torch.tensor([0.0, 0.0])) -> Tensor:
         """
-        Optimize the qLogEI acquisition function and return new candidates.
+        Optimize the qLogEI acquisition function and return new candidate points.
 
-        Parameters:
-            ref_point (Tensor, optional): Reference point for hypervolume calculation. Defaults to [0.0, 0.0].
+        Parameters
+        ----------
+        ref_point : Tensor, optional
+            The reference point for hypervolume calculation, typically representing 
+            a baseline for performance. Defaults to ``[0.0, 0.0]``.
 
-        Returns:
-            Tensor: New candidate points based on qLogEI optimization.
+        Returns
+        -------
+        Tensor
+            A tensor containing the new candidate points selected based on 
+            qLogEI optimization.
         """
         standard_bounds = torch.zeros(2, self.func.dim, device=self.device)
         standard_bounds[1] = 1
@@ -285,13 +350,15 @@ class Acquisition:
         """
         Perform qParEGO optimization using random weights for scalarization.
 
-        Returns:
-            Tensor: New candidate points based on qParEGO optimization.
+        Returns
+        -------
+        Tensor
+            A tensor containing the new candidate points selected based on qParEGO optimization.
         """
         standard_bounds = torch.tensor(
             [[0.0] * self.func.dim, [1.0] * self.func.dim],
             dtype=torch.double,
-        ).to(self.device) # normalized bounds
+        ).to(self.device)  # normalized bounds
         train_x = self.gps.train_x.to(self.device)
         train_y = self.gps.train_y.to(self.device)
         print(f"Inside parego: train_x shape: {train_x.shape}")
@@ -321,20 +388,21 @@ class Acquisition:
             options={"batch_limit": 3, "maxiter": 1000},
         )
         return new_x.to(self.device)
-    
+ 
     def qlogparego(self) -> Tensor:
         """
         Perform qParEGO optimization using qNParEGO from BoTorch.
 
-        Returns:
-            Tensor: New candidate points based on qParEGO optimization.
+        Returns
+        -------
+        Tensor
+            A tensor containing the candidate points selected based on qParEGO optimization.
         """
         # Standardize bounds for optimization
         standard_bounds = torch.tensor(
             [[0.0] * self.func.dim, [1.0] * self.func.dim],
             dtype=torch.double,
-        ).to(self.device) # normalized bounds
-
+        ).to(self.device)  # normalized bounds
 
         train_x = self.gps.train_x.to(self.device)
         sampler = SobolQMCNormalSampler(sample_shape=torch.Size([128]))
@@ -346,7 +414,7 @@ class Acquisition:
             X_baseline=train_x,
             sampler=sampler,
             constraints=[lambda z: z[..., -self.gps.ncons]],
-            prune_baseline=True, # This is recommended to improve performance
+            prune_baseline=True,  # This is recommended to improve performance
         )
 
         # Optimize the acquisition function
@@ -365,8 +433,10 @@ class Acquisition:
         """
         Perform Predictive Entropy Search for Multi-Objective optimization (PESMO).
 
-        Returns:
-            Tensor: Candidate points generated by PESMO.
+        Returns
+        -------
+        Tensor
+            A tensor containing the candidate points selected by PESMO.
         """
         dim = self.func.dim
         bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
@@ -396,8 +466,10 @@ class Acquisition:
         """
         Perform Multi-Objective Max-Value Entropy Search (MESMO).
 
-        Returns:
-            Tensor: Candidate points generated by MESMO.
+        Returns
+        -------
+        Tensor
+            A tensor containing the candidate points selected by MESMO.
         """
         dim = self.func.dim
         bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
@@ -432,8 +504,13 @@ class Acquisition:
         """
         Perform Joint Entropy Search for Multi-Objective optimization (JESMO).
 
-        Returns:
-            Tensor: Candidate points generated by JESMO.
+        JESMO is an acquisition function that uses joint entropy search to efficiently
+        explore the Pareto frontier in multi-objective Bayesian optimization.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing the candidate points generated by JESMO.
         """
         dim = self.func.dim
         bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
@@ -468,10 +545,12 @@ class Acquisition:
 
     def sobol(self) -> Tensor:
         """
-        Generate random samples.
+        Generate random Sobol sequence samples.
 
-        Returns:
-            Tensor: Randomly generated candidate points.
+        Returns
+        -------
+        Tensor
+            A tensor of randomly generated candidate points using the Sobol sequence.
         """
         standard_bounds = torch.row_stack(
             [torch.zeros(self.func.dim), torch.ones(self.func.dim)]
@@ -480,23 +559,35 @@ class Acquisition:
             bounds=standard_bounds, n=1, q=self.q
         ).squeeze(1).to(self.device)
     
-    def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int=0):
+    def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int = 0):
         """
         Perform Thompson Sampling Efficient Multiobjective Optimization (TS-EMO).
 
-        Parameters:
-            save_dir (str): The directory to save the TS-EMO results.
-            iters (int): How many iters TS-EMO should run for.
-            ref_point (Tensor): The reference point for the hypervolume calculation.
-            train_shape (int): The train_shape for determining the size of bounds.
-            rep (int): The repetition of the experiment. Defaults to 0.
+        Parameters
+        ----------
+        save_dir : str
+            The directory to save the TS-EMO results.
+        iters : int
+            How many iterations TS-EMO should run for.
+        ref_point : Tensor
+            The reference point for the hypervolume calculation.
+        train_shape : int
+            The shape for determining the size of bounds.
+        rep : int, optional
+            The repetition of the experiment. Defaults to 0.
 
-        Returns:
-            x (numpy.ndarray): The inputs of the function chosen by TS-EMO.
-            y (numpy.ndarray): The outputs of the function for each input.
-            times (numpy.ndarray): The time that each iteration takes.
-            hv (list): The list of the hypervolume at each iteration.
-            pf (Tensor): The Pareto frontier determined by TS-EMO.
+        Returns
+        -------
+        x : np.ndarray
+            The inputs of the function chosen by TS-EMO.
+        y : np.ndarray
+            The outputs of the function for each input.
+        times : np.ndarray
+            The time that each iteration takes.
+        hv : list
+            The list of the hypervolume at each iteration.
+        pf : Tensor
+            The Pareto frontier determined by TS-EMO.
         """
         ts = TSEMORunner(self.func.name, 
                          self.gps.train_x, 
