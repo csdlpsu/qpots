@@ -8,7 +8,7 @@ This repository is maintained by the Computational Complex Engineered Systems De
 
 .. _CSDL: https://sites.psu.edu/csdl/
 
-Read the documentation `here <https://qpots-batch-pareto-optimal-thompson-sampling.readthedocs.io/en/latest/>`_.
+Read the `documentation <https://qpots-batch-pareto-optimal-thompson-sampling.readthedocs.io/en/latest/>`_.
 
 Installing qPOTS
 ================

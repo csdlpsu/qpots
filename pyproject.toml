@@ -7,7 +7,7 @@ qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
 
 [project]
 name = "qPOTS"
-version = "1.0.4"
+version = "1.0.5"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
