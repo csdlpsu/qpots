@@ -4,61 +4,81 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 
+
 class ModelObject:
     """
-    A class to represent multi-objective GP models using independent MLE Gaussian Processes (GPs) 
-    for each objective. Each GP is trained using maximum likelihood estimation (MLE) with fixed noise.
+    A class representing multi-objective Gaussian Process (GP) models.
+
+    This class constructs and fits independent Gaussian Process models for each objective 
+    using Maximum Likelihood Estimation (MLE). The models are used in multi-objective 
+    optimization problems where constraints can be included.
     """
 
-    def __init__(self, train_x, train_y, bounds,
-                 nobj,
-                 ncons,
-                 device, 
-                 noise_std=1e-6):
+    def __init__(
+        self, 
+        train_x: torch.Tensor, 
+        train_y: torch.Tensor, 
+        bounds: torch.Tensor, 
+        nobj: int, 
+        ncons: int, 
+        device: str, 
+        noise_std: float = 1e-6
+    ):
         """
         Initialize the multi-objective GP models.
 
-        Parameters:
-            train_x (torch.Tensor): Training input data.
-            train_y (torch.Tensor): Training output data (multi-objective).
-            bounds (torch.Tensor): Bounds for the input data.
-            nobj (int): Number of objective functions.
-            ncons (int): Number of constraints in the problem.
-            device (str): CUDA or CPU device for the arrays to operate on
-            noise_std (float): Standard deviation of noise for the GP model. Default is 1e-2.
+        Parameters
+        ----------
+        train_x : torch.Tensor
+            The input training data of shape `(n, d)`, where `n` is the number of samples 
+            and `d` is the input dimension.
+        train_y : torch.Tensor
+            The output training data of shape `(n, k)`, where `k` is the number of objectives.
+        bounds : torch.Tensor
+            A tensor specifying the lower and upper bounds for the input space.
+        nobj : int
+            The number of objective functions.
+        ncons : int
+            The number of constraints in the problem.
+        device : str
+            The computation device, either `"cpu"` or `"cuda"`.
+        noise_std : float, optional
+            The standard deviation of noise added to the GP model. Defaults to `1e-6`.
         """
         self.train_x = train_x.to(device)
         self.train_y = train_y.to(device)
         self.noise_std = noise_std
         self.bounds = bounds
         self.nobj = nobj
-        self.ncons= ncons
+        self.ncons = ncons
         self.device = device
         self.models = []
         self.mlls = []
 
     def fit_gp(self):
         """
-        Fit Gaussian Process (GP) models for each objective using maximum likelihood estimation (MLE).
-        The method creates K independent GP models, where K is the number of objectives, and fits them 
-        using exact marginal log likelihood.
+        Fit Gaussian Process (GP) models using Maximum Likelihood Estimation (MLE).
 
-        Returns:
-            None
+        This method fits `nobj` independent GP models, each corresponding to an objective function.
+        The models are trained using exact marginal log likelihood.
+
+        Returns
+        -------
+        None
         """
         num_outputs = self.train_y.shape[-1]
-        print("fitting GPs", flush=True)
+        print("Fitting GPs", flush=True)
         train_yvar = torch.ones_like(self.train_y[..., 0], dtype=torch.double).to(self.device).reshape(-1, 1) * self.noise_std ** 2
 
-        # Loop through each objective and fit a GP model
+        # Fit a GP model for each objective
         for i in range(num_outputs):
             print(f"Fit: {i}", flush=True)
             model = SingleTaskGP(
                 self.train_x,
-                standardize(self.train_y[..., i]).reshape(-1, 1).double(), 
+                standardize(self.train_y[..., i]).reshape(-1, 1).double(),
                 train_yvar
             ).to(self.train_x.device)
-            
+
             self.models.append(model)
             mll = ExactMarginalLogLikelihood(model.likelihood, model)
             self.mlls.append(mll)
@@ -67,24 +87,26 @@ class ModelObject:
 
     def fit_gp_no_variance(self):
         """
-        Fit Gaussian Process (GP) models for each objective using maximum likelihood estimation (MLE).
-        The method creates K independent GP models, where K is the number of objectives, and fits them 
-        using exact marginal log likelihood. No variance in the SingleTaskGP.
+        Fit Gaussian Process (GP) models without variance estimation.
 
-        Returns:
-            None
+        This method is similar to `fit_gp()`, but does not include variance in the GP model.
+        It fits `nobj` independent GP models using Maximum Likelihood Estimation (MLE).
+
+        Returns
+        -------
+        None
         """
         num_outputs = self.train_y.shape[-1]
-        print("fitting GPs", flush=True)
+        print("Fitting GPs", flush=True)
 
-        # Loop through each objective and fit a GP model
+        # Fit a GP model for each objective without variance
         for i in range(num_outputs):
             print(f"Fit: {i}", flush=True)
             model = SingleTaskGP(
                 self.train_x,
-                standardize(self.train_y[..., i]).reshape(-1, 1).double(), 
+                standardize(self.train_y[..., i]).reshape(-1, 1).double(),
             ).to(self.train_x.device)
-            
+
             self.models.append(model)
             mll = ExactMarginalLogLikelihood(model.likelihood, model)
             self.mlls.append(mll)
