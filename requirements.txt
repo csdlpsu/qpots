@@ -5,3 +5,6 @@ scipy==1.11.4
 gpytorch==1.13
 pymoo==0.6.1.1
 pytest
+sphinx
+sphinx-rtd-theme
+sphinx.ext.napoleon

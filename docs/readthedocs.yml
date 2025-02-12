@@ -1,0 +1,11 @@
+version: 2
+
+# Build Documentation Using Sphinx
+sphinx:
+  configuration: docs/source/conf.py
+
+# Install Python Dependencies
+python:
+  version: 3.10
+  install:
+    - requirements: ../requirements.txt
