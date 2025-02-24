@@ -6,8 +6,8 @@ build-backend = "setuptools.build_meta"
 qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
 
 [project]
-name = "qPOTS"
-version = "1.0.5"
+name = "qpots"
+version = "1.0.6"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
