@@ -21,7 +21,6 @@ Cite the paper:
       year={2023}
     }
 
-
 Installing qPOTS
 ================
 

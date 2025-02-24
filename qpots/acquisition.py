@@ -277,7 +277,7 @@ class Acquisition:
                 callback=track_pareto,
             )
         else:
-            gp_posterior_ = lambda x: self.gp_posterior(
+            gp_posterior_ = lambda x: self._gp_posterior(
                 x.to(self.device), self.gps, seed_iter=iteration
             )
             pymoo_func_gp = PyMooFunction(
