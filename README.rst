@@ -26,7 +26,7 @@ Installing qPOTS
 
 To install qPOTS with pip, run the following command in a terminal::
 
-    pip install qPOTS
+    pip install qpots
 
 To build from source, clone the repository and run pip in the top-level directory::
 
