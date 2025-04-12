@@ -3,8 +3,10 @@ from botorch.test_functions.multi_objective import (
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
     ZDT3, DiscBrake, MW7, OSY, WeldedBeam
 )
+from botorch.test_functions.synthetic import Branin
 from torch import Tensor
 from typing import Callable, Optional
+import torch
 
 
 class Function:
@@ -94,6 +96,7 @@ class Function:
             "mw7": lambda: MW7(dim=self.dim, negate=True),
             "osy": lambda: OSY(negate=True),
             "weldedbeam": lambda: WeldedBeam(negate=True),
+            "branin": lambda: Branin(negate=True),
         }
 
         if self.name not in func_map:

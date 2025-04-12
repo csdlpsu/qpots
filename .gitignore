@@ -23,3 +23,4 @@ venv/
 .ipynb_checkpoints/
 
 *.log
+.qodo

@@ -40,7 +40,7 @@ class ModelObject:
             The number of objective functions.
         ncons : int
             The number of constraints in the problem.
-        device : str
+        device : torch.device
             The computation device, either `"cpu"` or `"cuda"`.
         noise_std : float, optional
             The standard deviation of noise added to the GP model. Defaults to `1e-6`.
@@ -55,12 +55,17 @@ class ModelObject:
         self.models = []
         self.mlls = []
 
-    def fit_gp(self):
+    def fit_gp(self, single_objective=False):
         """
         Fit Gaussian Process (GP) models using Maximum Likelihood Estimation (MLE).
 
         This method fits `nobj` independent GP models, each corresponding to an objective function.
         The models are trained using exact marginal log likelihood.
+
+        Parameters
+        ----------
+        single_objective : bool
+            If True, fit just one GP otherwise fit GP for each objective
 
         Returns
         -------
@@ -71,26 +76,45 @@ class ModelObject:
         train_yvar = torch.ones_like(self.train_y[..., 0], dtype=torch.double).to(self.device).reshape(-1, 1) * self.noise_std ** 2
 
         # Fit a GP model for each objective
-        for i in range(num_outputs):
-            print(f"Fit: {i}", flush=True)
+        if single_objective == True:
+            print("fitting single objective")
             model = SingleTaskGP(
                 self.train_x,
-                standardize(self.train_y[..., i]).reshape(-1, 1).double(),
-                train_yvar
+                standardize(self.train_y[..., 1]).reshape(-1, 1).double(),
             ).to(self.train_x.device)
 
-            self.models.append(model)
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            self.mlls.append(mll)
+            for i in range(2):
+                self.models.append(model)
+                mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                self.mlls.append(mll)
 
-            fit_gpytorch_mll(mll)
+                fit_gpytorch_mll(mll)
+        else:
+            for i in range(num_outputs):
+                print(f"Fit: {i}", flush=True)
+                model = SingleTaskGP(
+                    self.train_x,
+                    standardize(self.train_y[..., i]).reshape(-1, 1).double(),
+                    train_yvar
+                ).to(self.train_x.device)
 
-    def fit_gp_no_variance(self):
+                self.models.append(model)
+                mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                self.mlls.append(mll)
+
+                fit_gpytorch_mll(mll)
+
+    def fit_gp_no_variance(self, single_objective=False):
         """
         Fit Gaussian Process (GP) models without variance estimation.
 
         This method is similar to `fit_gp()`, but does not include variance in the GP model.
         It fits `nobj` independent GP models using Maximum Likelihood Estimation (MLE).
+
+        Parameters
+        ----------
+        single_objective : bool
+            If True, fit just one GP otherwise fit GP for each objective
 
         Returns
         -------
@@ -100,15 +124,28 @@ class ModelObject:
         print("Fitting GPs", flush=True)
 
         # Fit a GP model for each objective without variance
-        for i in range(num_outputs):
-            print(f"Fit: {i}", flush=True)
+        if single_objective:
             model = SingleTaskGP(
                 self.train_x,
                 standardize(self.train_y[..., i]).reshape(-1, 1).double(),
             ).to(self.train_x.device)
 
-            self.models.append(model)
-            mll = ExactMarginalLogLikelihood(model.likelihood, model)
-            self.mlls.append(mll)
+            for i in range(2):
+                self.models.append(model)
+                mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                self.mlls.append(mll)
 
-            fit_gpytorch_mll(mll)
+                fit_gpytorch_mll(mll)
+        else:
+            for i in range(num_outputs):
+                print(f"Fit: {i}", flush=True)
+                model = SingleTaskGP(
+                    self.train_x,
+                    standardize(self.train_y[..., i]).reshape(-1, 1).double(),
+                ).to(self.train_x.device)
+
+                self.models.append(model)
+                mll = ExactMarginalLogLikelihood(model.likelihood, model)
+                self.mlls.append(mll)
+
+                fit_gpytorch_mll(mll)

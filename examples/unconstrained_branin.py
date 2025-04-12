@@ -16,12 +16,13 @@ from qpots.utils.utils import expected_hypervolume
 import torch
 from qpots.function import Function
 from botorch.utils.transforms import unnormalize
+from botorch.test_functions.synthetic import Branin
 
 device = torch.device("cpu")
 args = dict(
     {
         "ntrain": 20,
-        "iters": 50,
+        "iters": 100,
         "reps": 20,
         "q": 1,
         "wd": ".",
@@ -35,8 +36,14 @@ args = dict(
     }
 )
 
+def custom_func(x):
+    f = Branin(negate=True)
+
+    return f(x).unsqueeze(1).repeat(1, 2)
+
 # Set up problem
-tf = Function('branincurrin', dim=args["dim"], nobj=args["nobj"])
+bounds = torch.tensor([(-5, 10.), (0., 15.)])
+tf = Function(dim=args["dim"], nobj=args["nobj"], custom_func=custom_func, bounds=bounds)
 f = tf.evaluate
 bounds = tf.get_bounds()
 
@@ -49,7 +56,7 @@ train_y = f(unnormalize(train_x, bounds))
 
 # fit the GP models
 gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
-gps.fit_gp()
+gps.fit_gp(single_objective=True)
 
 # initialize 
 acq = Acquisition(tf, gps, device=device, q=args["q"])
@@ -70,7 +77,7 @@ for i in range(args["iters"]):
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
     gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
-    gps.fit_gp()
+    gps.fit_gp(single_objective=True)
 
     np.save(f"{args['wd']}/train_x.npy", train_x)
     np.save(f"{args['wd']}/train_y.npy", train_y)
