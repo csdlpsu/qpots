@@ -21,12 +21,12 @@ device = torch.device("cpu")
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
     {
-        "ntrain": 20,
-        "iters": 50,
+        "ntrain": 300,
+        "iters": 300,
         "reps": 20,
         "q": 1,
         "wd": "..",
-        "ref_point": torch.tensor([-300.0, -18.0]),
+        "ref_point": torch.tensor([-1.2, -1.2]),
         "dim": 2,
         "nobj": 2,
         "ncons": 0,
@@ -38,9 +38,10 @@ args = dict(
 )
 
 # Set up problem
-tf = Function('branincurrin', dim=args["dim"], nobj=args["nobj"])
+tf = Function('zdt3', dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
+print("Bounds:\n",bounds)
 
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
@@ -63,14 +64,11 @@ times, hvs = [], []
 for i in range(args["iters"]):
     t1 = time.time() # tracking time
     newx = acq.qpots(bounds, i, **args)
-    t2 = time.time()
-    times.append(t2 - t1)
     
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
     hvs.append(hv)
-        
-    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
+
         
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
@@ -78,13 +76,18 @@ for i in range(args["iters"]):
 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/train_x.npy", train_x)
-        np.save(f"{args['wd']}/train_y.npy", train_y)
-        np.save(f"{args['wd']}/hv.npy", hvs)
-        np.save(f"{args['wd']}/times.npy", times)
+        np.save(f"{args['wd']}/train_x_zdt3_30.npy", train_x)
+        np.save(f"{args['wd']}/train_y_zdt3_30.npy", train_y)
+        np.save(f"{args['wd']}/hv_zdt3_30.npy", hvs)
+        np.save(f"{args['wd']}/times_zdt3_30.npy", times)
     else:
         gps.fit_gp()
-        np.save(f"{args['wd']}/train_x_Model_list.npy", train_x)
-        np.save(f"{args['wd']}/train_y_Model_list.npy", train_y)
-        np.save(f"{args['wd']}/hv_Model_list.npy", hvs)
-        np.save(f"{args['wd']}/times_Model_list.npy", times)
+        np.save(f"{args['wd']}/train_x_Model_list_zdt3_30.npy", train_x)
+        np.save(f"{args['wd']}/train_y_Model_list_zdt3_30.npy", train_y)
+        np.save(f"{args['wd']}/hv_Model_list_zdt3_30.npy", hvs)
+        np.save(f"{args['wd']}/times_Model_list_zdt3_30.npy", times)
+
+
+    t2 = time.time()
+    times.append(t2 - t1)
+    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")

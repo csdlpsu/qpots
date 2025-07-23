@@ -1,9 +1,11 @@
 import torch
+import numpy as np
 from typing import Optional, Callable
 from torch import Tensor
 from scipy.spatial.distance import cdist
 from botorch.utils.transforms import normalize
 from botorch.models.model_list_gp_regression import ModelListGP
+from botorch.models import MultiTaskGP
 from botorch.acquisition.objective import GenericMCObjective
 from botorch.utils.sampling import draw_sobol_samples, sample_simplex
 from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
@@ -215,6 +217,50 @@ class Acquisition:
 
         return -Ys
 
+    def _mt_gp_posterior(self, x: Tensor, gps: MultiTaskGP, seed_iter: int = 1) -> Tensor:
+        """
+        Compute posterior samples for PyMoo optimization for MultiTaskGP.
+
+        Parameters
+        ----------
+        x : Tensor
+            A tensor of input points for which posterior samples are computed.
+        gps : MultiTaskGP
+            A multi-task Gaussian Process model used to estimate the posterior distribution.
+        seed_iter : int, optional
+            An iteration index for seeding randomness in sampling. Defaults to 1.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing posterior samples from the GP models, with
+            infeasible points penalized if constraints exist.
+        """
+        torch.manual_seed(1024 + seed_iter)
+
+        
+        model=gps.models[0]
+        Ys_=[]
+        for task in range(self.nobj+self.ncons):
+            
+            task_ids=task*torch.ones(x.shape[0],1)
+            x_norm=normalize(x,gps.bounds)
+            x_mt=torch.cat([x_norm,task_ids],dim=-1)
+          
+            sample=model.posterior(x_mt).sample().squeeze(0)
+            Ys_.append(sample)
+        
+        Ys_ = unstandardize(torch.cat(Ys_, -1), gps.train_y.to(self.device))
+
+        if self.ncons > 0:
+            ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
+            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
+            Ys = Ys_[..., : self.nobj]
+        else:
+            Ys = Ys_
+
+        return -Ys
+
     def qpots(
         self,
         bounds: Tensor,
@@ -277,9 +323,15 @@ class Acquisition:
                 callback=track_pareto,
             )
         else:
-            gp_posterior_ = lambda x: self._gp_posterior(
-                x.to(self.device), self.gps, seed_iter=iteration
-            )
+            
+            if kwargs["mt"] == 0:
+                gp_posterior_ = lambda x: self._gp_posterior(
+                    x.to(self.device), self.gps, seed_iter=iteration
+                )
+            else:
+                gp_posterior_ = lambda x: self._mt_gp_posterior(
+                    x.to(self.device), self.gps, seed_iter=iteration
+                )
             pymoo_func_gp = PyMooFunction(
                 gp_posterior_,
                 n_var=kwargs["dim"],
@@ -290,7 +342,7 @@ class Acquisition:
             res = nsga2(
                 pymoo_func_gp,
                 ngen=kwargs["ngen"],
-                pop_size=100 * kwargs["dim"],
+                pop_size=100 * kwargs["dim"] ,
                 seed=2430,
             )
         

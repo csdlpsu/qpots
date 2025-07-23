@@ -1,5 +1,6 @@
 import torch
 from botorch.models import SingleTaskGP
+from botorch.models import MultiTaskGP
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
@@ -89,7 +90,7 @@ class ModelObject:
                 self.mlls.append(mll)
 
                 fit_gpytorch_mll(mll)
-        else:
+        else: 
             for i in range(num_outputs):
                 print(f"Fit: {i}", flush=True)
                 model = SingleTaskGP(
@@ -103,6 +104,28 @@ class ModelObject:
                 self.mlls.append(mll)
 
                 fit_gpytorch_mll(mll)
+    
+    def fit_multitask_gp(self):
+        num_outputs = self.train_y.shape[-1]
+        num_inputs = self.train_x.shape[0] 
+        print("Fitting GPs", flush=True)
+        print("fitting multitask")
+        
+        task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
+        train_x_mt=torch.cat([self.train_x.repeat(num_outputs,1),task_ids],dim=-1).double()
+        
+        model = MultiTaskGP(
+            train_x_mt,
+            standardize(self.train_y).T.reshape(-1, 1).double(),
+            task_feature=-1
+        ).to(self.train_x.device)
+        
+        self.models.append(model)
+        mll = ExactMarginalLogLikelihood(model.likelihood, model)
+        self.mlls.append(mll)
+        fit_gpytorch_mll(mll)
+        print("Fitting successful")
+
 
     def fit_gp_no_variance(self, single_objective=False):
         """

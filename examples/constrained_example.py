@@ -24,7 +24,7 @@ args = dict(
             "iters": 200,
             "reps": 20,
             "q": 1,
-            "wd": ".",
+            "wd": "..",
             "ref_point": -1*torch.tensor([5.8, 4.0]),
             "dim": 4,
             "nobj": 2,
@@ -32,6 +32,7 @@ args = dict(
             "nystrom": 0,
             "nychoice": "pareto",
             "ngen": 10,
+            "mt": 1,
         }
     )
 
@@ -50,7 +51,10 @@ train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))]) # St
 print(train_y.shape, train_x.shape) # This should be n_train x (nobj + ncons) tensor
 
 gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
-gps.fit_gp()
+if args["mt"]==1:
+    gps.fit_multitask_gp()
+else:
+    gps.fit_gp()
 
 acq = Acquisition(tf, gps, cons=cons, device=device, q=args["q"])
 
@@ -58,8 +62,7 @@ hvs, times = [], []
 for i in range(args["iters"]):
     t1 = time.time()
     newx = acq.qpots(bounds=bounds, iteration=i, **args)
-    t2 = time.time()
-    times.append(t2 - t1)
+    
 
     newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
     newconsy = cons(unnormalize(newx.reshape(-1, args["dim"]), bounds))
@@ -68,15 +71,24 @@ for i in range(args["iters"]):
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
     hvs.append(hv)
         
-    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
 
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
     gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
-    gps.fit_gp()
+    if args["mt"]==1:
+        gps.fit_multitask_gp()
+        np.save(f"{args['wd']}/train_x_cons.npy", train_x)
+        np.save(f"{args['wd']}/train_y_cons.npy", train_y)
+        np.save(f"{args['wd']}/hv_cons.npy", hvs)
+        np.save(f"{args['wd']}/times_cons.npy", times)
+    else:
+        gps.fit_gp()
+        np.save(f"{args['wd']}/train_x_Model_list_cons.npy", train_x)
+        np.save(f"{args['wd']}/train_y_Model_list_cons.npy", train_y)
+        np.save(f"{args['wd']}/hv_Model_list_cons.npy", hvs)
+        np.save(f"{args['wd']}/times_Model_list_cons.npy", times)
 
-    np.save(f"{args['wd']}/train_x.npy", train_x)
-    np.save(f"{args['wd']}/train_y.npy", train_y)
-    np.save(f"{args['wd']}/hv.npy", hvs)
-    np.save(f"{args['wd']}/times.npy", times)
+    t2 = time.time()
+    times.append(t2 - t1)
+    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
 
