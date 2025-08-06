@@ -21,12 +21,12 @@ device = torch.device("cpu")
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
     {
-        "ntrain": 300,
-        "iters": 300,
+        "ntrain": 50,
+        "iters": 200,
         "reps": 20,
-        "q": 1,
+        "q": 4,
         "wd": "..",
-        "ref_point": torch.tensor([-1.2, -1.2]),
+        "ref_point": torch.tensor([-10., -10.]),
         "dim": 2,
         "nobj": 2,
         "ncons": 0,
@@ -41,10 +41,10 @@ args = dict(
 tf = Function('zdt3', dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
-print("Bounds:\n",bounds)
+#print("Bounds:\n",bounds)
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1023)
+#torch.manual_seed(1023)
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
