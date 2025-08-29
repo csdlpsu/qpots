@@ -32,6 +32,24 @@ def unstandardize(Y: Tensor, train_y: Tensor) -> Tensor:
     std = train_y.std(dim=0)
     return Y * std + mean
 
+def standardize_ignore_nan(Y: torch.Tensor) -> torch.Tensor:
+    """
+    Standardize Y along dim=0 ignoring NaNs.
+    NaNs remain in place.
+    """
+    mean = torch.nanmean(Y, dim=0, keepdim=True)
+
+    diff = Y - mean
+    diff_squared = diff ** 2
+    diff_squared = torch.where(torch.isnan(diff_squared), torch.zeros_like(diff_squared), diff_squared)
+    count = (~torch.isnan(Y)).sum(dim=0, keepdim=True)
+    std = torch.sqrt(diff_squared.sum(dim=0, keepdim=True) / (count - 1))
+    std = torch.where(std == 0, torch.ones_like(std), std) 
+
+    Y_std = (Y - mean) / std
+    return torch.where(torch.isnan(Y), torch.tensor(float('nan'), device=Y.device), Y_std)
+
+
 
 def expected_hypervolume(
     gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False

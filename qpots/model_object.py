@@ -5,6 +5,8 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 from gpytorch.kernels import ScaleKernel, MaternKernel
+#Added 8/29 for partial information with train_y
+from qpots.utils.utils import standardize_ignore_nan
 
 
 class ModelObject:
@@ -82,8 +84,8 @@ class ModelObject:
         train_yvar = torch.ones_like(self.train_y[..., 0], dtype=torch.double).to(self.device).reshape(-1, 1) * self.noise_std ** 2
 
         # Fit a GP model for each objective
-        # 8/28 - Getting rid of the Single Objective case for now, just for clarity. Can add it back later
-        """
+        # 8/29 Come back to the ModelList Section Later (focus MultiTaskGP first)
+        
         if single_objective == True:
             print("fitting single objective")
             model = SingleTaskGP(
@@ -96,11 +98,9 @@ class ModelObject:
                 mll = ExactMarginalLogLikelihood(model.likelihood, model)
                 self.mlls.append(mll)
 
-                fit_gpytorch_mll(mll)
-        else: 
-        """
-        #8/28, Initialization run, then running only for the new task IDs
-        if self.task_ids is None:
+                fit_gpytorch_mll(mll) 
+        
+        else:
             for i in range(num_outputs):
                 self.ntrain=self.train_x.shape[0] #Setting number of training points
                 print(f"Fit: {i}", flush=True)
@@ -115,9 +115,7 @@ class ModelObject:
                 self.mlls.append(mll)
 
                 fit_gpytorch_mll(mll)
-        else:
-            #Need some way to add only the certain train_x to certain tasks, because the train_y will be the same.
-            print("ADD MORE HERE")
+        
     
     def fit_multitask_gp(self):
         num_outputs = self.train_y.shape[-1]
@@ -126,14 +124,29 @@ class ModelObject:
         
         #New section 8/27, attempting to deal with partial information, so it does not use every input (train_x) with every objective 
         if self.task_ids is None:
+            self.ntrain=num_inputs
             self.task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
             train_x_mt=torch.cat([self.train_x.repeat(num_outputs,1),self.task_ids],dim=-1).double()
-            self.ntrain=num_inputs
+            train_y_mt=standardize(self.train_y).T.reshape(-1, 1).double()
+            
+        
         else: #Getting initial and new points, where new points are only on one task, initial are on all tasks (should work, tested in ROAR collab)
-            init_train_x_mt=torch.cat([self.train_x[:self.ntrain].repeat(num_outputs,1),self.task_ids[:2*self.ntrain]],dim=-1).double() #Jointly training on both tasks for the initial training data only
-            new_train_x_mt=torch.cat([self.train_x[self.ntrain:],self.task_ids[2*self.ntrain:]],dim=-1).double() #Getting the new train_x with its task_id
-            train_x_mt=torch.cat([init_train_x_mt,new_train_x_mt]) #Stacking the init data and the new data
+            #Train_x
+            init_train_x=torch.cat([self.train_x[:self.ntrain].repeat(num_outputs,1),self.task_ids[:2*self.ntrain]],dim=-1).double() #Jointly training on both tasks for the initial training data only
+            new_train_x=torch.cat([self.train_x[self.ntrain:],self.task_ids[2*self.ntrain:]],dim=-1).double() #Getting the new train_x with its task_id
+            train_x_mt=torch.cat([init_train_x,new_train_x]) #Stacking the init data and the new data
 
+            #8/29 - Here I am assuming that the train_y is being entered with NaN values found in the tasks that are not being used
+            #May need to question this assumption later, and have qPOTS deal with the NaN instead of the user, or maybe this will work with that too, but as of now it is successful
+            #Relies on the standardize_ignore_nan in utils
+
+            #Train_y
+            standardized_train_y=standardize_ignore_nan(self.train_y) #standardizing first to sort it out
+            train_y_mt=standardized_train_y[:self.ntrain].T.reshape(-1, 1).double() 
+    
+            for val in self.train_y[self.ntrain:].reshape(-1,1):
+                if not torch.isnan(val):
+                    train_y_mt=torch.cat([train_y_mt,val.reshape(-1,1)])
             
         #Testing 8/25 Using Matern 5/2 Kernel 
         custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
