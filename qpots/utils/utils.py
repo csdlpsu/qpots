@@ -153,6 +153,57 @@ def select_candidates(
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     return selected_candidates
 
+def select_candidates_decoupled(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None
+) -> Tensor:
+    """
+    Select candidates from the Pareto-optimal set.
+
+    Parameters
+    ----------
+    gps : ModelObject
+        Gaussian Process models.
+    pareto_set : numpy.ndarray
+        Pareto-optimal set of solutions.
+    device : torch.device
+        Device to store the selected candidates.
+    q : int, optional
+        Number of candidates to select. Defaults to 1.
+    seed : int, optional
+        Random seed for sampling.
+
+    Returns
+    -------
+    torch.Tensor
+        Selected candidate points.
+    """
+    if seed is not None:
+        torch.manual_seed(seed)
+    # ----- Layer 1: Distance heuristic -----
+    D = cdist(pareto_set, gps.train_x.numpy())
+    selected_indices = D.min(axis=-1).argsort()[-q:]
+    selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
+
+    # ----- Layer 2: Variance heuristic -----
+    # For each candidate, pick the task with highest predictive variance
+    task_ids = []
+    print("Choosing tasks")
+    model=gps.models[0]
+    for x in selected_candidates:
+        x = x.unsqueeze(0)  # shape [1, dim]
+        print("Candidate: ",x)
+        with torch.no_grad():
+            posterior = model.posterior(x)  # MultiTaskGP returns mean/variance per task
+            var = posterior.variance.squeeze(0)  # shape [n_tasks]
+        print("variance: ",var )
+        chosen_task = torch.argmax(var).item()
+        print("Chose Task: ",chosen_task)
+        task_ids.append(chosen_task)
+
+    task_ids = torch.tensor(task_ids, device=device, dtype=torch.long)
+    print("Task IDs:",task_ids)
+
+    return selected_candidates, task_ids
+
 
 def arg_parser():
     """

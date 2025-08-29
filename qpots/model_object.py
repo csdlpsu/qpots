@@ -4,6 +4,7 @@ from botorch.models import MultiTaskGP
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
+from gpytorch.kernels import ScaleKernel, MaternKernel
 
 
 class ModelObject:
@@ -19,11 +20,12 @@ class ModelObject:
         self, 
         train_x: torch.Tensor, 
         train_y: torch.Tensor, 
-        bounds: torch.Tensor, 
+        bounds: torch.Tensor,
         nobj: int, 
         ncons: int, 
         device: str, 
-        noise_std: float = 1e-6
+        noise_std: float = 1e-6,
+        
     ):
         """
         Initialize the multi-objective GP models.
@@ -55,6 +57,9 @@ class ModelObject:
         self.device = device
         self.models = []
         self.mlls = []
+        #Testing task_id storage 8/27
+        self.task_ids = None
+        self.ntrain = None
 
     def fit_gp(self, single_objective=False):
         """
@@ -77,6 +82,8 @@ class ModelObject:
         train_yvar = torch.ones_like(self.train_y[..., 0], dtype=torch.double).to(self.device).reshape(-1, 1) * self.noise_std ** 2
 
         # Fit a GP model for each objective
+        # 8/28 - Getting rid of the Single Objective case for now, just for clarity. Can add it back later
+        """
         if single_objective == True:
             print("fitting single objective")
             model = SingleTaskGP(
@@ -91,7 +98,11 @@ class ModelObject:
 
                 fit_gpytorch_mll(mll)
         else: 
+        """
+        #8/28, Initialization run, then running only for the new task IDs
+        if self.task_ids is None:
             for i in range(num_outputs):
+                self.ntrain=self.train_x.shape[0] #Setting number of training points
                 print(f"Fit: {i}", flush=True)
                 model = SingleTaskGP(
                     self.train_x,
@@ -104,20 +115,34 @@ class ModelObject:
                 self.mlls.append(mll)
 
                 fit_gpytorch_mll(mll)
+        else:
+            #Need some way to add only the certain train_x to certain tasks, because the train_y will be the same.
+            print("ADD MORE HERE")
     
     def fit_multitask_gp(self):
         num_outputs = self.train_y.shape[-1]
         num_inputs = self.train_x.shape[0] 
-        print("Fitting GPs", flush=True)
-        print("fitting multitask")
+        print("Fitting MultiTaskGP", flush=True)
         
-        task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
-        train_x_mt=torch.cat([self.train_x.repeat(num_outputs,1),task_ids],dim=-1).double()
-        
+        #New section 8/27, attempting to deal with partial information, so it does not use every input (train_x) with every objective 
+        if self.task_ids is None:
+            self.task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
+            train_x_mt=torch.cat([self.train_x.repeat(num_outputs,1),self.task_ids],dim=-1).double()
+            self.ntrain=num_inputs
+        else: #Getting initial and new points, where new points are only on one task, initial are on all tasks (should work, tested in ROAR collab)
+            init_train_x_mt=torch.cat([self.train_x[:self.ntrain].repeat(num_outputs,1),self.task_ids[:2*self.ntrain]],dim=-1).double() #Jointly training on both tasks for the initial training data only
+            new_train_x_mt=torch.cat([self.train_x[self.ntrain:],self.task_ids[2*self.ntrain:]],dim=-1).double() #Getting the new train_x with its task_id
+            train_x_mt=torch.cat([init_train_x_mt,new_train_x_mt]) #Stacking the init data and the new data
+
+            
+        #Testing 8/25 Using Matern 5/2 Kernel 
+        custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
+
         model = MultiTaskGP(
             train_x_mt,
             standardize(self.train_y).T.reshape(-1, 1).double(),
-            task_feature=-1
+            task_feature=-1,
+            covar_module=custom_kernel
         ).to(self.train_x.device)
         
         self.models.append(model)

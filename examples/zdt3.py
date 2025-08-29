@@ -21,8 +21,8 @@ device = torch.device("cpu")
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
     {
-        "ntrain": 50,
-        "iters": 200,
+        "ntrain": 20,
+        "iters": 50,
         "reps": 20,
         "q": 4,
         "wd": "..",
@@ -44,7 +44,7 @@ bounds = tf.get_bounds()
 #print("Bounds:\n",bounds)
 
 os.makedirs(args["wd"], exist_ok=True)
-#torch.manual_seed(1023)
+torch.manual_seed(1024)
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
@@ -76,10 +76,10 @@ for i in range(args["iters"]):
 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/train_x_zdt3_30.npy", train_x)
-        np.save(f"{args['wd']}/train_y_zdt3_30.npy", train_y)
-        np.save(f"{args['wd']}/hv_zdt3_30.npy", hvs)
-        np.save(f"{args['wd']}/times_zdt3_30.npy", times)
+        np.save(f"{args['wd']}/Matern_zdt3_train_x.npy", train_x)
+        np.save(f"{args['wd']}/Matern_zdt3_train_y.npy", train_y)
+        np.save(f"{args['wd']}/Matern_zdt3_hv.npy", hvs)
+        np.save(f"{args['wd']}/Matern_zdt3_times.npy", times)
     else:
         gps.fit_gp()
         np.save(f"{args['wd']}/train_x_Model_list_zdt3_30.npy", train_x)

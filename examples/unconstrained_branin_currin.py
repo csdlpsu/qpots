@@ -34,6 +34,7 @@ args = dict(
         "nychoice": "pareto",
         "ngen": 10,
         "mt": 1,
+        "decoupled_variance": 1,
     }
 )
 
@@ -62,7 +63,11 @@ acq = Acquisition(tf, gps, device=device, q=args["q"])
 times, hvs = [], []
 for i in range(args["iters"]):
     t1 = time.time() # tracking time
-    newx = acq.qpots(bounds, i, **args)
+    if args["decoupled_variance"]==1:
+        newx = acq.qpots(bounds, i, **args)
+    else:
+        newx = acq.qpots(bounds, i, **args)
+    
     t2 = time.time()
     times.append(t2 - t1)
     
@@ -78,10 +83,10 @@ for i in range(args["iters"]):
 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/train_x.npy", train_x)
-        np.save(f"{args['wd']}/train_y.npy", train_y)
-        np.save(f"{args['wd']}/hv.npy", hvs)
-        np.save(f"{args['wd']}/times.npy", times)
+        np.save(f"{args['wd']}/Matern_BC_train_x.npy", train_x)
+        np.save(f"{args['wd']}/Matern_BC_train_y.npy", train_y)
+        np.save(f"{args['wd']}/Matern_BC_hv.npy", hvs)
+        np.save(f"{args['wd']}/Matern_BC_times.npy", times)
     else:
         gps.fit_gp()
         np.save(f"{args['wd']}/train_x_Model_list.npy", train_x)

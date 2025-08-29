@@ -29,7 +29,7 @@ from botorch.acquisition.multi_objective.joint_entropy_search import (
 )
 from botorch.optim.optimize import optimize_acqf, optimize_acqf_list
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from qpots.utils.utils import unstandardize, select_candidates
+from qpots.utils.utils import unstandardize, select_candidates, select_candidates_decoupled
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
@@ -346,9 +346,16 @@ class Acquisition:
                 seed=2430,
             )
         
-        selected_candidates = select_candidates(
-            self.gps, res.X, self.device, q=kwargs["q"], seed=2043
-        )
+        if kwargs["decoupled_variance"] == 0:
+            selected_candidates = select_candidates(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
+            )
+        #Testing new Partial Info / Decoupled 8/25
+        else:
+            selected_candidates, new_task_ids = select_candidates_decoupled(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
+            )
+            self.gps.task_ids=torch.cat([self.gps.task_ids,torch.tensor(new_task_ids).reshape(-1,1)]) #adding the new task IDs 8/27
         
         return normalize(selected_candidates, bounds)
 
