@@ -29,7 +29,7 @@ from botorch.acquisition.multi_objective.joint_entropy_search import (
 )
 from botorch.optim.optimize import optimize_acqf, optimize_acqf_list
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from qpots.utils.utils import unstandardize, select_candidates, select_candidates_decoupled
+from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_candidates, select_candidates_partial_info
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
@@ -248,9 +248,11 @@ class Acquisition:
             x_mt=torch.cat([x_norm,task_ids],dim=-1)
           
             sample=model.posterior(x_mt).sample().squeeze(0)
+            
             Ys_.append(sample)
         
-        Ys_ = unstandardize(torch.cat(Ys_, -1), gps.train_y.to(self.device))
+        #9/1 need new unstandardize that ignores NaNs (implemented 9/2)
+        Ys_ = unstandardize_ignore_nan(torch.cat(Ys_, -1), gps.train_y.to(self.device))
 
         if self.ncons > 0:
             ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
@@ -258,6 +260,12 @@ class Acquisition:
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
+
+        #9/1 Testing: Found NaNs in Ys!!!
+        #print("Posterior Ys_ shape:", Ys_.shape)
+        #print("Posterior Ys_:", Ys_)
+        #print("Any NaNs?", torch.isnan(Ys_).any())
+        #print("Min/Max:", Ys_.min().item(), Ys_.max().item())
 
         return -Ys
 
@@ -339,6 +347,7 @@ class Acquisition:
                 xl=bounds[0].detach().cpu().numpy(),
                 xu=bounds[1].detach().cpu().numpy(),
             )
+
             res = nsga2(
                 pymoo_func_gp,
                 ngen=kwargs["ngen"],
@@ -346,16 +355,17 @@ class Acquisition:
                 seed=2430,
             )
         
-        if kwargs["decoupled_variance"] == 0:
+        if kwargs["partial_info"] == 0:
             selected_candidates = select_candidates(
                 self.gps, res.X, self.device, q=kwargs["q"], seed=2043
             )
-        #Testing new Partial Info / Decoupled 8/25
+        #Testing new Partial Info 8/25
         else:
-            selected_candidates, new_task_ids = select_candidates_decoupled(
+            selected_candidates, new_task_ids = select_candidates_partial_info(
                 self.gps, res.X, self.device, q=kwargs["q"], seed=2043
             )
-            self.gps.task_ids=torch.cat([self.gps.task_ids,torch.tensor(new_task_ids).reshape(-1,1)]) #adding the new task IDs 8/27
+            self.gps.task_ids=torch.cat([self.gps.task_ids,new_task_ids.reshape(-1,1)]) #adding the new task IDs 8/27
+            return normalize(selected_candidates, bounds), self.gps.task_ids[-kwargs["q"]:]
         
         return normalize(selected_candidates, bounds)
 

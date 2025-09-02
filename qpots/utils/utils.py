@@ -32,6 +32,28 @@ def unstandardize(Y: Tensor, train_y: Tensor) -> Tensor:
     std = train_y.std(dim=0)
     return Y * std + mean
 
+#Added 9/2 to unstandardize when train_y has NaN values in it for partial information
+#Can probably replace the normal unstandardize, because it works (tested) with both NaN and no NaN
+def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
+    """
+    Reverse the standardization of output `Y` using the mean and standard deviation 
+    computed from the training data, works when NaN values are in the train_y tensor.
+
+    Parameters
+    ----------
+    Y : torch.Tensor
+        The standardized output tensor.
+    train_y : torch.Tensor
+        The training output data used to compute the mean and standard deviation.
+
+    Returns
+    -------
+    torch.Tensor
+        The unstandardized output tensor.
+    """
+    mean = torch.nanmean(train_y, dim=0)
+    std = torch.from_numpy(np.nanstd(train_y.cpu().numpy(), axis=0, ddof=1)).to(train_y)
+    return Y * std + mean
 
 def expected_hypervolume(
     gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False
@@ -54,6 +76,9 @@ def expected_hypervolume(
         - hypervolume_value (float): The computed hypervolume.
         - pareto_front (torch.Tensor): The Pareto front tensor.
     """
+    #Edited for NaN on 9/2 (only max, not min)
+    nan_mask = ~torch.isnan(gps.train_y[..., :gps.nobj]).any(dim=1)
+    Y_valid = gps.train_y[nan_mask, :gps.nobj]
     if min:
         if gps.ncons > 0:
             is_feas = (gps.train_y[..., -gps.ncons:] >= 0).all(dim=-1)
@@ -70,13 +95,17 @@ def expected_hypervolume(
             hypervolume_value = hv_calculator.compute(-1 * pareto_front)
             return hypervolume_value, pareto_front
     else:
+        #Constrained Still needs testing, 9/2
         if gps.ncons > 0:
             is_feas = (gps.train_y[..., -gps.ncons:] >= 0).all(dim=-1)
-            is_feas_obj = gps.train_y[is_feas]
-            bd1 = FastNondominatedPartitioning(ref_point.double(), is_feas_obj.double()[..., : gps.nobj])
+            valid_mask = is_feas & nan_mask
+            Y_valid = gps.train_y[valid_mask]
+
+            bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
+        #Changed 9/2
         else:
-            bd1 = FastNondominatedPartitioning(ref_point.double(), gps.train_y[..., : gps.nobj].double())
+            bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
 
 
@@ -153,7 +182,7 @@ def select_candidates(
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     return selected_candidates
 
-def select_candidates_decoupled(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None
+def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None
 ) -> Tensor:
     """
     Select candidates from the Pareto-optimal set.
@@ -176,33 +205,27 @@ def select_candidates_decoupled(gps: ModelObject, pareto_set: np.ndarray, device
     torch.Tensor
         Selected candidate points.
     """
-    if seed is not None:
-        torch.manual_seed(seed)
-    # ----- Layer 1: Distance heuristic -----
+    #if seed is not None:
+    #    torch.manual_seed(seed)
+    
+    #Original Distance Heuristic (Chooses points):
+
     D = cdist(pareto_set, gps.train_x.numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
-
-    # ----- Layer 2: Variance heuristic -----
-    # For each candidate, pick the task with highest predictive variance
-    task_ids = []
-    print("Choosing tasks")
+    
+    # 9/1/25 - Selecting a random Task
+    #print("Choosing tasks")
     model=gps.models[0]
-    for x in selected_candidates:
-        x = x.unsqueeze(0)  # shape [1, dim]
-        print("Candidate: ",x)
-        with torch.no_grad():
-            posterior = model.posterior(x)  # MultiTaskGP returns mean/variance per task
-            var = posterior.variance.squeeze(0)  # shape [n_tasks]
-        print("variance: ",var )
-        chosen_task = torch.argmax(var).item()
-        print("Chose Task: ",chosen_task)
-        task_ids.append(chosen_task)
+    ntasks=gps.train_y.shape[-1]
 
-    task_ids = torch.tensor(task_ids, device=device, dtype=torch.long)
-    print("Task IDs:",task_ids)
+    rand_task_ids = torch.randint(0, ntasks, (q,))
 
-    return selected_candidates, task_ids
+    print("D shape:", D.shape)
+    if pareto_set.shape[0]<=q:
+        print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
+    
+    return selected_candidates, rand_task_ids
 
 
 def arg_parser():
