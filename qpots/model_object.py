@@ -5,6 +5,8 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 from gpytorch.kernels import ScaleKernel, MaternKernel
+#Added 8/29 for partial information with train_y
+from qpots.utils.utils import standardize_ignore_nan
 
 class ModelObject:
     """
@@ -156,6 +158,17 @@ class ModelObject:
             #print("train_x_mt shape:", train_x_mt.shape)   # should be [44, d+1]
             #print("train_y_mt shape:", train_y_mt.shape)   # should be [44, 1]
 
+            #8/29 - Here I am assuming that the train_y is being entered with NaN values found in the tasks that are not being used
+            #May need to question this assumption later, and have qPOTS deal with the NaN instead of the user, or maybe this will work with that too, but as of now it is successful
+            #Relies on the standardize_ignore_nan in utils
+
+            #Train_y
+            standardized_train_y=standardize_ignore_nan(self.train_y) #standardizing first to sort it out
+            train_y_mt=standardized_train_y[:self.ntrain].T.reshape(-1, 1).double() 
+    
+            for val in self.train_y[self.ntrain:].reshape(-1,1):
+                if not torch.isnan(val):
+                    train_y_mt=torch.cat([train_y_mt,val.reshape(-1,1)])
             
         #Testing 8/25 Using Matern 5/2 Kernel 
         custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
