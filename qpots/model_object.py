@@ -5,8 +5,7 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 from gpytorch.kernels import ScaleKernel, MaternKernel
-#Added 8/29 for partial information with train_y
-from qpots.utils.utils import standardize_ignore_nan
+
 
 class ModelObject:
     """
@@ -163,7 +162,7 @@ class ModelObject:
             #Relies on the standardize_ignore_nan in utils
 
             #Train_y
-            standardized_train_y=standardize_ignore_nan(self.train_y) #standardizing first to sort it out
+            standardized_train_y=self.standardize_ignore_nan(self.train_y) #standardizing first to sort it out
             train_y_mt=standardized_train_y[:self.ntrain].T.reshape(-1, 1).double() 
     
             for val in self.train_y[self.ntrain:].reshape(-1,1):
