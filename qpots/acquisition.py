@@ -260,13 +260,6 @@ class Acquisition:
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
-
-        #9/1 Testing: Found NaNs in Ys!!!
-        #print("Posterior Ys_ shape:", Ys_.shape)
-        #print("Posterior Ys_:", Ys_)
-        #print("Any NaNs?", torch.isnan(Ys_).any())
-        #print("Min/Max:", Ys_.min().item(), Ys_.max().item())
-
         return -Ys
 
     def qpots(
@@ -362,10 +355,11 @@ class Acquisition:
         #Testing new Partial Info 8/25
         else:
             selected_candidates, new_task_ids = select_candidates_partial_info(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["variance_threshold"]
             )
             self.gps.task_ids=torch.cat([self.gps.task_ids,new_task_ids.reshape(-1,1)]) #adding the new task IDs 8/27
-            return normalize(selected_candidates, bounds), self.gps.task_ids[-kwargs["q"]:]
+            
+            return normalize(selected_candidates, bounds), new_task_ids
         
         return normalize(selected_candidates, bounds)
 

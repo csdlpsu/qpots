@@ -237,6 +237,9 @@ class ModelObject:
         """
         Standardize Y along dim=0 ignoring NaNs.
         NaNs remain in place.
+        Returns
+        -------
+        standardized Y tensor
         """
         mean = torch.nanmean(Y, dim=0, keepdim=True)
 
@@ -249,3 +252,22 @@ class ModelObject:
 
         Y_std = (Y - mean) / std
         return torch.where(torch.isnan(Y), torch.tensor(float('nan'), device=Y.device), Y_std)
+    
+    #9/3 Adding a method to fill the NaN values in train_y with their posterior means at said location
+    def posterior_mean_fill(self):
+        """
+        After partial information, train_y will have NaN values, which makes it impossible to extract the true pareto frontier.
+        Returns
+        -------
+        full_train_y, a tensor that fills all NaN's from train_y with the posterior mean of the model at said location
+        """
+        mtgp=self.models[0]
+        full_train_y = self.train_y.clone().detach()
+        for m in range(self.nobj):
+            missing_mask = torch.isnan(full_train_y[:, m])
+            if missing_mask.any():
+                X_missing = self.train_x[missing_mask]
+                task_idx = torch.full((X_missing.shape[0], 1), m, dtype=torch.long, device=self.train_x.device)
+                posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
+                full_train_y[missing_mask, m] = posterior.mean.squeeze(-1)
+        return full_train_y

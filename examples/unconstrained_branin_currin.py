@@ -35,6 +35,7 @@ args = dict(
         "ngen": 10,
         "mt": 1,
         "partial_info": 1,
+        "variance_threshold": 1.0e-5,
     }
 )
 
@@ -71,18 +72,25 @@ for i in range(args["iters"]):
     else:
         newx = acq.qpots(bounds, i, **args)
         
-    
     t2 = time.time()
     times.append(t2 - t1)
 
-    #EDIT HERE to get the new_y to work:
+    #New_y, Need to bring this into qPOTS at some point, and fix it such that it actually does partial evaluations
     if args["partial_info"]==1:
         full_newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
-        #print("full function evaluation:\n",full_newy)
+        
         newy = torch.full_like(full_newy, float('nan'))
-        #print(newy)
-        newy[torch.arange(args["q"]),new_task_id.squeeze(-1)]=full_newy[torch.arange(args["q"]), new_task_id.squeeze(-1)]
-        #print(newy)
+    
+        #New version of newy, works for more than 1 task selected per new_x
+        #This will ultimately have to change and be brought into qPOTS, as it still obfuscates the problem of evaluating only some objectives
+        for i in range(newx.shape[0]):
+            cols = new_task_id[i]
+            valid_mask = ~torch.isnan(cols)           
+            cols = cols[valid_mask].long()             
+            newy[i, cols] = full_newy[i, cols]
+    else:
+        newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
     hvs.append(hv)
         
@@ -101,7 +109,7 @@ for i in range(args["iters"]):
         np.save(f"{args['wd']}/Partial_BC_train_y.npy", train_y)
         np.save(f"{args['wd']}/Partial_BC_hv.npy", hvs)
         np.save(f"{args['wd']}/Partial_BC_times.npy", times)
-        np.save(f"{args['wd']}/Partial_BC_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
+        #np.save(f"{args['wd']}/Partial_BC_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
         gps.fit_gp()
         np.save(f"{args['wd']}/train_x_Model_list.npy", train_x)
@@ -109,3 +117,6 @@ for i in range(args["iters"]):
         np.save(f"{args['wd']}/hv_Model_list.npy", hvs)
         np.save(f"{args['wd']}/times_Model_list.npy", times)
 
+#New addition to fill with the means at the locations where train_y is NaN
+train_y_filled=gps.posterior_mean_fill()
+np.save(f"{args['wd']}/Partial_BC_train_y_filled.npy", train_y_filled.detach().cpu().numpy())

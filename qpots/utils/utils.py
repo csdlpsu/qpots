@@ -182,7 +182,7 @@ def select_candidates(
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     return selected_candidates
 
-def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None
+def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None
 ) -> Tensor:
     """
     Select candidates from the Pareto-optimal set.
@@ -199,11 +199,15 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         Number of candidates to select. Defaults to 1.
     seed : int, optional
         Random seed for sampling.
+    thresh : float, optional
+        Variance threshold value to choose tasks. 
+        If left blank, defaults to randomly choosing tasks.
 
     Returns
     -------
     torch.Tensor
         Selected candidate points.
+        Selected task IDs
     """
     #if seed is not None:
     #    torch.manual_seed(seed)
@@ -215,17 +219,45 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     
     # 9/1/25 - Selecting a random Task
-    #print("Choosing tasks")
+    
     model=gps.models[0]
-    ntasks=gps.train_y.shape[-1]
+    num_inputs=selected_candidates.shape[0]
+    num_outputs=gps.train_y.shape[-1]
+    if thresh is None:
+        print("Random Task Choice:")
+        task_ids = torch.randint(0, num_outputs, (q,))
+    else:
+        print("Variance Thresholding Task Choice")
+        if seed is not None:
+            torch.manual_seed(seed)
 
-    rand_task_ids = torch.randint(0, ntasks, (q,))
+        #9/3 Variance Thresholding task selection 
+        #Appending Task_IDs for fantasizing on a MultiTaskGP
+        task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
+        new_x_mt=torch.cat([selected_candidates.repeat(num_outputs,1),task_ids],dim=-1).double()
+        #Just pulling from the variance, and the y given for the fantasizing does not affect it
+        rand_y_mt=torch.rand(num_inputs,num_outputs).double().T.reshape(-1, 1).double() 
+        #Fantasizing
+        new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double())
+        new_variance = new_model.posterior(selected_candidates).variance
+        
+        #Variance thresholding
+        task_ids = torch.full_like(new_variance,float('nan'))
+        mask = new_variance>thresh
+        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+        task_ids[mask]=tasks_stacked[mask]
+        #checking if any rows are full of nans and removing them:
+        nan_mask = ~torch.isnan(new_task_ids).all(dim=1)
+        new_task_ids = new_task_ids[nan_mask]
+        selected_candidates = selected_candidates[nan_mask]
+        print(task_ids)
 
+    #9/2 Bug Testing
     print("D shape:", D.shape)
     if pareto_set.shape[0]<=q:
         print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
-    
-    return selected_candidates, rand_task_ids
+        
+    return selected_candidates, task_ids
 
 
 def arg_parser():
