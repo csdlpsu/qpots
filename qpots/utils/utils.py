@@ -243,14 +243,16 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         
         #Variance thresholding
         task_ids = torch.full_like(new_variance,float('nan'))
+        print("Threshold: ",thresh)
+        print("new_variance:\n",new_variance)
         mask = new_variance>thresh
         tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
         task_ids[mask]=tasks_stacked[mask]
         #checking if any rows are full of nans and removing them:
-        nan_mask = ~torch.isnan(new_task_ids).all(dim=1)
-        new_task_ids = new_task_ids[nan_mask]
+        nan_mask = ~torch.isnan(task_ids).all(dim=1)
+        task_ids = task_ids[nan_mask]
         selected_candidates = selected_candidates[nan_mask]
-        print(task_ids)
+        print("Chosen Task IDs:\n",task_ids)
 
     #9/2 Bug Testing
     print("D shape:", D.shape)

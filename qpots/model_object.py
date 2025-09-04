@@ -23,6 +23,7 @@ class ModelObject:
         bounds: torch.Tensor,
         nobj: int, 
         ncons: int, 
+        ntrain: int,
         device: str, 
         noise_std: float = 1e-6,
         
@@ -54,12 +55,10 @@ class ModelObject:
         self.bounds = bounds
         self.nobj = nobj
         self.ncons = ncons
+        self.ntrain = ntrain
         self.device = device
         self.models = []
         self.mlls = []
-        #Testing task_id storage 8/27
-        self.task_ids = None
-        self.ntrain = None
 
     def fit_gp(self, single_objective=False):
         """
@@ -113,62 +112,32 @@ class ModelObject:
                 fit_gpytorch_mll(mll)
     
     def fit_multitask_gp(self):
-        num_outputs = self.train_y.shape[-1]
-        num_inputs = self.train_x.shape[0] 
         print("Fitting MultiTaskGP", flush=True)
         
-        #New section 8/27, attempting to deal with partial information, so it does not use every input (train_x) with every objective 
-        if self.task_ids is None:
-            self.ntrain=num_inputs
-            self.task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
-            train_x_mt=torch.cat([self.train_x.repeat(num_outputs,1),self.task_ids],dim=-1).double()
-            train_y_mt=standardize(self.train_y).T.reshape(-1, 1).double()
-            
+        #9/3 - Updating the train_x and y adjustments for MTGP
+        num_inputs, dim = self.train_x.shape
         
-        else: #Getting initial and new points, where new points are only on one task, initial are on all tasks (should work, tested in ROAR collab)
-            
-            #print(self.train_y)
-            #Train_x
-            init_train_x=torch.cat([self.train_x[:self.ntrain].repeat(num_outputs,1),self.task_ids[:2*self.ntrain]],dim=-1).double() #Jointly training on both tasks for the initial training data only
-            new_train_x=torch.cat([self.train_x[self.ntrain:],self.task_ids[2*self.ntrain:]],dim=-1).double() #Getting the new train_x with its task_id
-            train_x_mt=torch.cat([init_train_x,new_train_x]) #Stacking the init data and the new data
+        #Initial training data :
+        x_init = self.train_x[:self.ntrain].unsqueeze(1).expand(-1, self.nobj, -1).reshape(-1, dim)
+        train_y_mt = self.standardize_ignore_nan(self.train_y)[:self.ntrain].reshape(-1,1)
+        
+        task_ids_init = torch.arange(self.nobj).expand(self.ntrain,self.nobj).reshape(-1,1)
+        train_x_mt = torch.cat([x_init,task_ids_init],dim=-1)
 
-            #print("train_x:\n",self.train_x)
-            #print("train_x_mt:\n",train_x_mt)
+        #Additional training data:
+        if num_inputs > self.ntrain:
+            new_x=self.train_x[self.ntrain:]
+            new_y=self.standardize_ignore_nan(self.train_y)[self.ntrain:]
+            nan_mask = ~torch.isnan(new_y)
+            rows, tasks = nan_mask.nonzero(as_tuple=True) 
+            if rows.numel() > 0: #Just in case there are no new values (might be able to delete because I am filtering empty rows eleswhere)
+                new_x = new_x[rows]
+                new_task_ids = tasks.unsqueeze(1)
+                new_x_mt = torch.cat([new_x,new_task_ids],dim=-1)
+                train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0)
 
-            #8/29 - Here I am assuming that the train_y is being entered with NaN values found in the tasks that are not being used
-            #May need to question this assumption later, and have qPOTS deal with the NaN instead of the user, or maybe this will work with that too, but as of now it is successful
-            #Relies on the standardize_ignore_nan in utils
-
-            #Train_y
-            standardized_train_y=self.standardize_ignore_nan(self.train_y) #standardizing first to sort it out
-            train_y_mt=standardized_train_y[:self.ntrain].T.reshape(-1, 1).double() 
-            #"""
-            for val in self.train_y[self.ntrain:].reshape(-1,1):
-                if not torch.isnan(val):
-                    train_y_mt=torch.cat([train_y_mt,val.reshape(-1,1)])
-            """
-            # Append only non-NaN new entries
-            mask = ~torch.isnan(self.train_y[self.ntrain:])  # shape [4, 2]
-            new_train_y = self.train_y[self.ntrain:][mask].reshape(-1, 1).double()
-            """
-            #train_y_mt = torch.cat([train_y_mt, new_train_y])
-            #print(train_y_mt)
-            #print("train_x_mt shape:", train_x_mt.shape)   # should be [44, d+1]
-            #print("train_y_mt shape:", train_y_mt.shape)   # should be [44, 1]
-
-            #8/29 - Here I am assuming that the train_y is being entered with NaN values found in the tasks that are not being used
-            #May need to question this assumption later, and have qPOTS deal with the NaN instead of the user, or maybe this will work with that too, but as of now it is successful
-            #Relies on the standardize_ignore_nan in utils
-
-            #Train_y
-            standardized_train_y=self.standardize_ignore_nan(self.train_y) #standardizing first to sort it out
-            train_y_mt=standardized_train_y[:self.ntrain].T.reshape(-1, 1).double() 
-    
-            for val in self.train_y[self.ntrain:].reshape(-1,1):
-                if not torch.isnan(val):
-                    train_y_mt=torch.cat([train_y_mt,val.reshape(-1,1)])
-            
+                train_y_mt=torch.cat([train_y_mt,new_y[rows, tasks].reshape(-1,1)])
+        
         #Testing 8/25 Using Matern 5/2 Kernel 
         custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
 

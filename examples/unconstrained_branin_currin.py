@@ -35,7 +35,7 @@ args = dict(
         "ngen": 10,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": 1.0e-5,
+        "variance_threshold": 0.0012,
     }
 )
 
@@ -53,7 +53,7 @@ train_y = f(unnormalize(train_x, bounds))
 full_y=train_y
 
 # fit the GP models
-gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
+gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
 if args["mt"]==1:
     gps.fit_multitask_gp()
 else:
@@ -83,11 +83,11 @@ for i in range(args["iters"]):
     
         #New version of newy, works for more than 1 task selected per new_x
         #This will ultimately have to change and be brought into qPOTS, as it still obfuscates the problem of evaluating only some objectives
-        for i in range(newx.shape[0]):
-            cols = new_task_id[i]
+        for j in range(newx.shape[0]):
+            cols = new_task_id[j]
             valid_mask = ~torch.isnan(cols)           
             cols = cols[valid_mask].long()             
-            newy[i, cols] = full_newy[i, cols]
+            newy[j, cols] = full_newy[j, cols]
     else:
         newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
 
@@ -99,17 +99,22 @@ for i in range(args["iters"]):
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
     full_y=torch.row_stack([full_y, full_newy])
-    #gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
-    gps.train_x=train_x
-    gps.train_y=train_y
+    
+    #9/3 Try reinitializing class again:
+    gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
+    
+    #Failsafe update version
+    #gps.train_x=train_x
+    #gps.train_y=train_y
 
+ ############### Saving Files and updating GP Block ############### 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/Partial_BC_train_x.npy", train_x)
-        np.save(f"{args['wd']}/Partial_BC_train_y.npy", train_y)
-        np.save(f"{args['wd']}/Partial_BC_hv.npy", hvs)
-        np.save(f"{args['wd']}/Partial_BC_times.npy", times)
-        #np.save(f"{args['wd']}/Partial_BC_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
+        np.save(f"{args['wd']}/var_thresh_Partial_BC_train_x.npy", train_x)
+        np.save(f"{args['wd']}/var_thresh_Partial_BC_train_y.npy", train_y)
+        np.save(f"{args['wd']}/var_thresh_Partial_BC_hv.npy", hvs)
+        np.save(f"{args['wd']}/var_thresh_Partial_BC_times.npy", times)
+        np.save(f"{args['wd']}/var_thresh_Partial_BC_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
         gps.fit_gp()
         np.save(f"{args['wd']}/train_x_Model_list.npy", train_x)
@@ -119,4 +124,4 @@ for i in range(args["iters"]):
 
 #New addition to fill with the means at the locations where train_y is NaN
 train_y_filled=gps.posterior_mean_fill()
-np.save(f"{args['wd']}/Partial_BC_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
+np.save(f"{args['wd']}/var_thresh_Partial_BC_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
