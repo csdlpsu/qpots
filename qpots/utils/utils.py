@@ -218,6 +218,13 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     selected_indices = D.min(axis=-1).argsort()[-q:]
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     
+    #9/2 Bug Testing
+    print("D shape:", D.shape)
+    if pareto_set.shape[0]<=q:
+        print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
+       
+
+
     # 9/1/25 - Selecting a random Task
     
     model=gps.models[0]
@@ -225,7 +232,23 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     num_outputs=gps.train_y.shape[-1]
     if thresh is None:
         print("Random Task Choice:")
-        task_ids = torch.randint(0, num_outputs, (q,))
+        #task_ids = torch.randint(0, num_outputs, (q,))
+        # start with all NaNs
+        task_ids = torch.full((q, num_outputs), float("nan")).double()
+
+        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+
+        # random mask: include/exclude tasks per row randomly
+        mask = torch.randint(0, 2, (q, num_outputs)).bool()
+
+        task_ids[mask] = tasks_stacked[mask].double()
+
+        # remove rows that are all NaN
+        nan_mask = ~torch.isnan(task_ids).all(dim=1)
+        task_ids = task_ids[nan_mask]
+        selected_candidates = selected_candidates[nan_mask]
+        print("Chosen Task IDs:\n",task_ids)
+
     else:
         print("Variance Thresholding Task Choice")
         if seed is not None:
@@ -254,13 +277,28 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         selected_candidates = selected_candidates[nan_mask]
         print("Chosen Task IDs:\n",task_ids)
 
-    #9/2 Bug Testing
-    print("D shape:", D.shape)
-    if pareto_set.shape[0]<=q:
-        print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
-        
+ 
     return selected_candidates, task_ids
 
+#9/3 Adding a method to fill the NaN values in train_y with their posterior means at said location
+def posterior_mean_fill(gps: ModelObject):
+    """
+    After partial information, train_y will have NaN values, which makes it impossible to extract the true pareto frontier.
+    Returns
+    -------
+    full_train_y, a tensor that fills all NaN's from train_y with the posterior mean of the model at said location
+    """
+    mtgp=gps.models[0]
+    full_train_y = gps.train_y.clone().detach()
+    for m in range(gps.nobj):
+        missing_mask = torch.isnan(full_train_y[:, m])
+        if missing_mask.any():
+            X_missing = gps.train_x[missing_mask]
+            task_idx = torch.full((X_missing.shape[0], 1), m, dtype=torch.long, device=gps.train_x.device)
+            posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
+            
+            full_train_y[missing_mask, m] = unstandardize_ignore_nan(posterior.mean,gps.train_y)[:, m]
+    return full_train_y
 
 def arg_parser():
     """

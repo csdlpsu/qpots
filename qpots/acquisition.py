@@ -253,7 +253,9 @@ class Acquisition:
         
         #9/1 need new unstandardize that ignores NaNs (implemented 9/2)
         Ys_ = unstandardize_ignore_nan(torch.cat(Ys_, -1), gps.train_y.to(self.device))
-
+        if torch.isnan(Ys_).any():
+            print("NaNs detected in Ys:")
+            print(Ys_)
         if self.ncons > 0:
             ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
             Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
