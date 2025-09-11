@@ -27,6 +27,7 @@ class ModelObject:
         device: str, 
         noise_std: float = 1e-6,
         
+        
     ):
         """
         Initialize the multi-objective GP models.
@@ -59,6 +60,8 @@ class ModelObject:
         self.device = device
         self.models = []
         self.mlls = []
+        
+        
 
     def fit_gp(self, single_objective=False):
         """
@@ -118,10 +121,10 @@ class ModelObject:
         num_inputs, dim = self.train_x.shape
         
         #Initial training data :
-        x_init = self.train_x[:self.ntrain].unsqueeze(1).expand(-1, self.nobj, -1).reshape(-1, dim)
+        x_init = self.train_x[:self.ntrain].unsqueeze(1).expand(-1, self.nobj+self.ncons, -1).reshape(-1, dim)
         train_y_mt = self.standardize_ignore_nan(self.train_y)[:self.ntrain].reshape(-1,1)
         
-        task_ids_init = torch.arange(self.nobj).expand(self.ntrain,self.nobj).reshape(-1,1)
+        task_ids_init = torch.arange(self.nobj+self.ncons).expand(self.ntrain,self.nobj+self.ncons).reshape(-1,1)
         train_x_mt = torch.cat([x_init,task_ids_init],dim=-1)
 
         #Additional training data:
@@ -137,7 +140,17 @@ class ModelObject:
                 train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0)
 
                 train_y_mt=torch.cat([train_y_mt,new_y[rows, tasks].reshape(-1,1)])
-        
+
+        # 9/8 Testing for constraint handling
+        """
+        print(">> Entering fit_multitask_gp")
+        print("train_x_mt shape:", train_x_mt.shape)
+        print("train_y_mt shape:", train_y_mt.shape)
+        print("train_x_mt example:",train_x_mt[:6])
+        print("train_y example:", standardize(self.train_y)[:6])
+        print("train_y_mt example:", train_y_mt[:6])
+        """
+
         #Testing 8/25 Using Matern 5/2 Kernel 
         custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
 
@@ -145,7 +158,7 @@ class ModelObject:
             train_x_mt,
             train_y_mt,
             task_feature=-1,
-            covar_module=custom_kernel
+            #covar_module=custom_kernel
         ).to(self.train_x.device)
         
         self.models.append(model)
@@ -158,12 +171,13 @@ class ModelObject:
         
     def counter(self,train_x_mt):
         objective_indices = train_x_mt[:, -1].long()
-        total_evals_per_objective = torch.zeros(self.nobj, dtype=torch.int64)
+        total_evals_per_objective = torch.zeros(self.nobj+self.ncons, dtype=torch.int64)
 
-        for obj in range(self.nobj):
+        for obj in range(self.nobj+self.ncons):
             total_evals_per_objective[obj] = (objective_indices == obj).sum()
 
         print("Total evaluations per objective:", total_evals_per_objective)
+        #return total_evals_per_objective
 
 
     def fit_gp_no_variance(self, single_objective=False):

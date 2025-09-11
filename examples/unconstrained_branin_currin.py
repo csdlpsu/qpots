@@ -23,11 +23,11 @@ device = torch.device("cpu")
 args = dict(
     {
         "ntrain": 20,
-        "iters": 50,
+        "iters": 100,
         "reps": 20,
         "q": 4,
         "wd": "..",
-        "ref_point": torch.tensor([-300.0, -18.0]),
+        "ref_point": torch.tensor([-18.0, -6.0]),
         "dim": 2,
         "nobj": 2,
         "ncons": 0,
@@ -36,7 +36,7 @@ args = dict(
         "ngen": 10,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": .0012,
+        "variance_threshold": .0012, #.0012
     }
 )
 
@@ -46,7 +46,7 @@ f = tf.evaluate
 bounds = tf.get_bounds()
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1023)
+torch.manual_seed(2046)#OLD: 1023
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
@@ -91,7 +91,6 @@ for i in range(args["iters"]):
             newy[j, cols] = full_newy[j, cols]
     else:
         newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
-        
 
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
     hvs.append(hv)
@@ -113,20 +112,28 @@ for i in range(args["iters"]):
  ############### Saving Files and updating GP Block ############### 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/var_thresh_BC_train_x.npy", train_x)
-        np.save(f"{args['wd']}/var_thresh_BC_train_y.npy", train_y)
-        np.save(f"{args['wd']}/var_thresh_BC_hv.npy", hvs)
-        np.save(f"{args['wd']}/var_thresh_BC_times.npy", times)
+        if args["variance_threshold"] is None:
+            if args["partial_info"] == 1:
+                tag="rand"
+            else:
+                tag="joint"
+        else:
+            tag="var_thresh"
+        np.save(f"{args['wd']}/BC_"+tag+"_train_x.npy", train_x)
+        np.save(f"{args['wd']}/BC_"+tag+"_train_y.npy", train_y)
+        hvs_tensor = torch.stack(hvs)
+        np.save(f"{args['wd']}/BC_"+tag+"_hv.npy", hvs_tensor.detach().cpu().numpy())
+        np.save(f"{args['wd']}/BC_"+tag+"_times.npy", times)
         if args["partial_info"]==1:
-            np.save(f"{args['wd']}/var_thresh_BC_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
+            np.save(f"{args['wd']}/BC_"+tag+"_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
         gps.fit_gp()
-        np.save(f"{args['wd']}/train_x_Model_list.npy", train_x)
-        np.save(f"{args['wd']}/train_y_Model_list.npy", train_y)
-        np.save(f"{args['wd']}/hv_Model_list.npy", hvs)
-        np.save(f"{args['wd']}/times_Model_list.npy", times)
+        np.save(f"{args['wd']}/BC_Model_list_train_x.npy", train_x)
+        np.save(f"{args['wd']}/BC_Model_list_train_y.npy", train_y)
+        np.save(f"{args['wd']}/BC_Model_list_hv.npy", hvs)
+        np.save(f"{args['wd']}/BC_Model_list_times.npy", times)
 
 #New addition to fill with the means at the locations where train_y is NaN
 if args["partial_info"]==1:
     train_y_filled=posterior_mean_fill(gps)
-    np.save(f"{args['wd']}/var_thresh_BC_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
+    np.save(f"{args['wd']}/BC_"+tag+"_train_y_filled.npy", train_y_filled.detach().cpu().numpy())

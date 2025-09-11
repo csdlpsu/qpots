@@ -76,9 +76,12 @@ def expected_hypervolume(
         - hypervolume_value (float): The computed hypervolume.
         - pareto_front (torch.Tensor): The Pareto front tensor.
     """
+    #9/8, filling the train_y before using it for the HV calculations, so partial info points can be used (replaceing gps.train_y with train_y_filled (there should be no NaN in the filled, but keeping the NaN checker for safe redundancy as of now))
+    train_y_filled=posterior_mean_fill(gps)
+    
     #Edited for NaN on 9/2 (only max, not min)
-    nan_mask = ~torch.isnan(gps.train_y[..., :gps.nobj]).any(dim=1)
-    Y_valid = gps.train_y[nan_mask, :gps.nobj]
+    nan_mask = ~torch.isnan(train_y_filled[..., :gps.nobj]).any(dim=1)
+    
     if min:
         if gps.ncons > 0:
             is_feas = (gps.train_y[..., -gps.ncons:] >= 0).all(dim=-1)
@@ -95,18 +98,38 @@ def expected_hypervolume(
             hypervolume_value = hv_calculator.compute(-1 * pareto_front)
             return hypervolume_value, pareto_front
     else:
-        #Constrained Still needs testing, 9/2
+        #Changed 9/2
         if gps.ncons > 0:
-            is_feas = (gps.train_y[..., -gps.ncons:] >= 0).all(dim=-1)
+            is_feas = (train_y_filled[..., -gps.ncons:] >= 0).all(dim=-1)
             valid_mask = is_feas & nan_mask
-            Y_valid = gps.train_y[valid_mask]
+            Y_valid = train_y_filled[valid_mask]
 
             bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
         #Changed 9/2
         else:
+            Y_valid = train_y_filled[nan_mask, :gps.nobj]
             bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
+
+#9/10 using hypervolume of the real for plotting purposes only   
+def full_hypervolume(
+    gps: ModelObject, train_y_filled, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False
+) -> Tuple[float, Tensor]:
+
+    nan_mask = ~torch.isnan(train_y_filled[..., :gps.nobj]).any(dim=1)
+ 
+    if gps.ncons > 0:
+        is_feas = (train_y_filled[..., -gps.ncons:] >= 0).all(dim=-1)
+        valid_mask = is_feas & nan_mask
+        Y_valid = train_y_filled[valid_mask]
+
+        bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
+        return bd1.compute_hypervolume(), bd1.pareto_Y
+    else:
+        Y_valid = train_y_filled[nan_mask, :gps.nobj]
+        bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
+        return bd1.compute_hypervolume(), bd1.pareto_Y
 
 
 def gen_filtered_cands(
@@ -229,17 +252,19 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     
     model=gps.models[0]
     num_inputs=selected_candidates.shape[0]
-    num_outputs=gps.train_y.shape[-1]
+    
+    num_outputs=gps.nobj+gps.ncons #only using objectives for task_IDS, evaluating all constraints
     if thresh is None:
         print("Random Task Choice:")
         #task_ids = torch.randint(0, num_outputs, (q,))
         # start with all NaNs
-        task_ids = torch.full((q, num_outputs), float("nan")).double()
+        #9/9/25 replaceing q with num_inputs, such that if the NSGA-II pareto set is too small, it will still work and just select less points
+        task_ids = torch.full((num_inputs, num_outputs), float("nan")).double()
 
-        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+        tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
 
         # random mask: include/exclude tasks per row randomly
-        mask = torch.randint(0, 2, (q, num_outputs)).bool()
+        mask = torch.randint(0, 2, (num_inputs, num_outputs)).bool()
 
         task_ids[mask] = tasks_stacked[mask].double()
 
@@ -268,8 +293,8 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         task_ids = torch.full_like(new_variance,float('nan'))
         print("Threshold: ",thresh)
         print("new_variance:\n",new_variance)
-        mask = new_variance>thresh
-        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+        mask = new_variance>thresh.unsqueeze(0)
+        tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
         task_ids[mask]=tasks_stacked[mask]
         #checking if any rows are full of nans and removing them:
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
@@ -290,7 +315,7 @@ def posterior_mean_fill(gps: ModelObject):
     """
     mtgp=gps.models[0]
     full_train_y = gps.train_y.clone().detach()
-    for m in range(gps.nobj):
+    for m in range(gps.nobj+gps.ncons):
         missing_mask = torch.isnan(full_train_y[:, m])
         if missing_mask.any():
             X_missing = gps.train_x[missing_mask]
@@ -298,6 +323,7 @@ def posterior_mean_fill(gps: ModelObject):
             posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
             
             full_train_y[missing_mask, m] = unstandardize_ignore_nan(posterior.mean,gps.train_y)[:, m]
+            
     return full_train_y
 
 def arg_parser():

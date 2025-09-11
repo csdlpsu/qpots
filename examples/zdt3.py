@@ -11,7 +11,8 @@ warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
-from qpots.utils.utils import expected_hypervolume
+from qpots.utils.utils import expected_hypervolume, full_hypervolume
+from qpots.utils.utils import posterior_mean_fill
 
 import torch
 from qpots.function import Function
@@ -22,7 +23,7 @@ device = torch.device("cpu")
 args = dict(
     {
         "ntrain": 20,
-        "iters": 50,
+        "iters": 100,
         "reps": 20,
         "q": 4,
         "wd": "..",
@@ -34,6 +35,8 @@ args = dict(
         "nychoice": "pareto",
         "ngen": 10,
         "mt": 1,
+        "partial_info": 1,
+        "variance_threshold": torch.tensor([.0011,.0011]), #torch.tensor([3.00e-5,6.00e-5]) for Matern, .0011 for RBF
     }
 )
 
@@ -44,14 +47,15 @@ bounds = tf.get_bounds()
 #print("Bounds:\n",bounds)
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1024)
+torch.manual_seed(1021) #1022
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
 train_y = f(unnormalize(train_x, bounds))
+full_y=train_y
 
 # fit the GP models
-gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
+gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
 if args["mt"]==1:
     gps.fit_multitask_gp()
 else:
@@ -60,34 +64,70 @@ else:
 # initialize 
 acq = Acquisition(tf, gps, device=device, q=args["q"])
 
-times, hvs = [], []
+times, hvs, hvs_full = [], [], []
 for i in range(args["iters"]):
     t1 = time.time() # tracking time
-    newx = acq.qpots(bounds, i, **args)
+    if args["partial_info"]==1:
+        newx,new_task_id = acq.qpots(bounds, i, **args)
+    else:
+        newx = acq.qpots(bounds, i, **args)
     
-    newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+    if args["partial_info"]==1:
+        full_newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+        
+        newy = torch.full_like(full_newy, float('nan'))
+    
+        for j in range(newx.shape[0]):
+            cols = new_task_id[j]
+            valid_mask = ~torch.isnan(cols)           
+            cols = cols[valid_mask].long()             
+            newy[j, cols] = full_newy[j, cols]
+    else:
+        newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+
     hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
+    hv_full, _ = full_hypervolume(gps, full_y, ref_point=args['ref_point'])
     hvs.append(hv)
+    hvs_full.append(hv_full)
 
         
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
-    gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
+    if args["partial_info"]==1:
+        full_y=torch.row_stack([full_y, full_newy])
+
+    gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
 
     if args["mt"]==1:
         gps.fit_multitask_gp()
-        np.save(f"{args['wd']}/Matern_zdt3_train_x.npy", train_x)
-        np.save(f"{args['wd']}/Matern_zdt3_train_y.npy", train_y)
-        np.save(f"{args['wd']}/Matern_zdt3_hv.npy", hvs)
-        np.save(f"{args['wd']}/Matern_zdt3_times.npy", times)
+        if args["variance_threshold"] is None:
+            if args["partial_info"] == 1:
+                tag="rand"
+            else:
+                tag="joint"
+        else:
+            tag="var_thresh"
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_train_x.npy", train_x)
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_train_y.npy", train_y)
+        hvs_tensor = torch.stack(hvs)
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_hv.npy", hvs_tensor.detach().cpu().numpy())
+        hvs_full_tensor = torch.stack(hvs_full)
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_hv_full.npy", hvs_full_tensor.detach().cpu().numpy())
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_times.npy", times)
+        if args["partial_info"]==1:
+            np.save(f"{args['wd']}/ZDT3_"+tag+"_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
         gps.fit_gp()
-        np.save(f"{args['wd']}/train_x_Model_list_zdt3_30.npy", train_x)
-        np.save(f"{args['wd']}/train_y_Model_list_zdt3_30.npy", train_y)
-        np.save(f"{args['wd']}/hv_Model_list_zdt3_30.npy", hvs)
-        np.save(f"{args['wd']}/times_Model_list_zdt3_30.npy", times)
+        np.save(f"{args['wd']}/ZDT3_Model_list_train_x.npy", train_x)
+        np.save(f"{args['wd']}/ZDT3_Model_list_train_y.npy", train_y)
+        np.save(f"{args['wd']}/ZDT3_Model_list_hv.npy", hvs)
+        np.save(f"{args['wd']}/ZDT3_Model_list_times.npy", times)
 
 
     t2 = time.time()
     times.append(t2 - t1)
-    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
+    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv} and {hv_full}")
+
+    if args["partial_info"]==1:
+        train_y_filled=posterior_mean_fill(gps)
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
