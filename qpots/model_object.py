@@ -130,12 +130,18 @@ class ModelObject:
         #Additional training data:
         if num_inputs > self.ntrain:
             new_x=self.train_x[self.ntrain:]
+            #print("Fitting new_x post training",new_x)
             new_y=self.standardize_ignore_nan(self.train_y)[self.ntrain:]
+            #print("Fitting new_y post training (standardized)",new_y)
             nan_mask = ~torch.isnan(new_y)
+            #print("Fitting nan_mask ",nan_mask)
             rows, tasks = nan_mask.nonzero(as_tuple=True) 
+            #print("Fitting rows and tasks",rows,tasks)
             if rows.numel() > 0: #Just in case there are no new values (might be able to delete because I am filtering empty rows eleswhere)
                 new_x = new_x[rows]
+                #print("Fitting new_x post new_x[rows]",new_x)
                 new_task_ids = tasks.unsqueeze(1)
+                #print("Chosen Task IDs in model_object fit_gp:\n",new_task_ids)
                 new_x_mt = torch.cat([new_x,new_task_ids],dim=-1)
                 train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0)
 
@@ -158,7 +164,7 @@ class ModelObject:
             train_x_mt,
             train_y_mt,
             task_feature=-1,
-            #covar_module=custom_kernel
+            covar_module=custom_kernel
         ).to(self.train_x.device)
         
         self.models.append(model)
@@ -171,8 +177,9 @@ class ModelObject:
         
     def counter(self,train_x_mt):
         objective_indices = train_x_mt[:, -1].long()
+        #print("iteration added Task IDs in model_object:\n",train_x_mt[40:, -1])
         total_evals_per_objective = torch.zeros(self.nobj+self.ncons, dtype=torch.int64)
-
+        
         for obj in range(self.nobj+self.ncons):
             total_evals_per_objective[obj] = (objective_indices == obj).sum()
 

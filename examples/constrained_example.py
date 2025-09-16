@@ -35,7 +35,7 @@ args = dict(
             "ngen": 10,
             "mt": 1,
             "partial_info": 1,
-            "variance_threshold": 9.790e-5, #9.790e-5
+            "variance_threshold": torch.tensor([9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5]), #9.790e-5
         }
     )
 

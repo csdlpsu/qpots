@@ -34,9 +34,9 @@ args = dict(
         "nystrom": 0,
         "nychoice": "pareto",
         "ngen": 10,
-        "mt": 1,
-        "partial_info": 1,
-        "variance_threshold": torch.tensor([.0011,.0011]), #torch.tensor([3.00e-5,6.00e-5]) for Matern, .0011 for RBF
+        "mt": 0,
+        "partial_info": 0,
+        "variance_threshold": None, #torch.tensor([3.00e-5,6.00e-5]) for Matern, .0011 for RBFtorch.tensor([.0011,.0011])
     }
 )
 
@@ -47,7 +47,7 @@ bounds = tf.get_bounds()
 #print("Bounds:\n",bounds)
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1021) #1022
+torch.manual_seed(1022) #1022
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
@@ -85,7 +85,7 @@ for i in range(args["iters"]):
     else:
         newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
 
-    hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
+    hv, pf = expected_hypervolume(gps, ref_point=args['ref_point'])
     hv_full, _ = full_hypervolume(gps, full_y, ref_point=args['ref_point'])
     hvs.append(hv)
     hvs_full.append(hv_full)
@@ -114,6 +114,7 @@ for i in range(args["iters"]):
         hvs_full_tensor = torch.stack(hvs_full)
         np.save(f"{args['wd']}/ZDT3_"+tag+"_hv_full.npy", hvs_full_tensor.detach().cpu().numpy())
         np.save(f"{args['wd']}/ZDT3_"+tag+"_times.npy", times)
+        np.save(f"{args['wd']}/ZDT3_"+tag+"_pareto_front.npy", pf.detach().cpu().numpy())
         if args["partial_info"]==1:
             np.save(f"{args['wd']}/ZDT3_"+tag+"_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
@@ -122,6 +123,7 @@ for i in range(args["iters"]):
         np.save(f"{args['wd']}/ZDT3_Model_list_train_y.npy", train_y)
         np.save(f"{args['wd']}/ZDT3_Model_list_hv.npy", hvs)
         np.save(f"{args['wd']}/ZDT3_Model_list_times.npy", times)
+        np.save(f"{args['wd']}/ZDT3_Model_list_pareto_front.npy", pf.detach().cpu().numpy())
 
 
     t2 = time.time()

@@ -359,6 +359,7 @@ class Acquisition:
             selected_candidates, new_task_ids = select_candidates_partial_info(
                 self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["variance_threshold"]
             )
+            #print("Chosen Task IDs in aquisition:\n",new_task_ids)
             return normalize(selected_candidates, bounds), new_task_ids
         
         return normalize(selected_candidates, bounds)

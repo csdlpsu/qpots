@@ -242,7 +242,7 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     
     #9/2 Bug Testing
-    print("D shape:", D.shape)
+    #print("D shape:", D.shape)
     if pareto_set.shape[0]<=q:
         print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
        
@@ -272,7 +272,7 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
         task_ids = task_ids[nan_mask]
         selected_candidates = selected_candidates[nan_mask]
-        print("Chosen Task IDs:\n",task_ids)
+        #print("Chosen Task IDs:\n",task_ids)
 
     else:
         print("Variance Thresholding Task Choice")
@@ -289,21 +289,47 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double())
         new_variance = new_model.posterior(selected_candidates).variance
         
+        #9/15 Testing normalization between 0 and 1 for variance
+        normalized_variance=minmax_scale(new_variance)
+        print(normalized_variance)
+
         #Variance thresholding
         task_ids = torch.full_like(new_variance,float('nan'))
-        print("Threshold: ",thresh)
-        print("new_variance:\n",new_variance)
-        mask = new_variance>thresh.unsqueeze(0)
+        #print("Threshold: ",thresh)
+        #print("new_variance:\n",new_variance)
+
+
+        #mask = new_variance>thresh.unsqueeze(0) #OLD MASK
+        mask = normalized_variance>thresh.unsqueeze(0) #NEW mask for normalized variance
         tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
         task_ids[mask]=tasks_stacked[mask]
         #checking if any rows are full of nans and removing them:
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
         task_ids = task_ids[nan_mask]
         selected_candidates = selected_candidates[nan_mask]
-        print("Chosen Task IDs:\n",task_ids)
+        #print("Chosen Task IDs in utils:\n",task_ids)
 
  
     return selected_candidates, task_ids
+
+#9/15 Testing normalization between 0 and 1 for variance
+def minmax_scale(x, dim=None,eps=1e-12):
+    """
+    Rescale a tensor to [0, 1] along the each column (task).
+    
+    Args:
+        x: input tensor (any shape)
+        dim: dimension along which to compute min/max. 
+             If None, scales over the entire tensor.
+        eps: small number to avoid division by zero
+        
+    Returns:
+        scaled tensor of same shape as x
+    """
+    x_min = x.min(dim=dim, keepdim=True).values if dim is not None else x.min()
+    x_max = x.max(dim=dim, keepdim=True).values if dim is not None else x.max()
+    
+    return (x - x_min) / (x_max - x_min + eps)
 
 #9/3 Adding a method to fill the NaN values in train_y with their posterior means at said location
 def posterior_mean_fill(gps: ModelObject):
