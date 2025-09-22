@@ -7,10 +7,32 @@ import os
 import time
 import numpy as np
 import sys
+import ast
+import torch
 
 #importing from the wrapper file
 manual_seed = int(sys.argv[1])
 print("Got param:", manual_seed)
+
+func_sent = str(sys.argv[2])
+q_sent = int(sys.argv[3])
+dim_sent = int(sys.argv[4])
+nobj_sent = int(sys.argv[5])
+ncons_sent = int(sys.argv[6])
+ntrain_sent = int(sys.argv[7])
+iters_sent = int(sys.argv[8])
+mtgp_sent = int(sys.argv[9])
+partial_sent = int(sys.argv[10])
+
+#arrays
+var_thresh_sent = str(sys.argv[11])
+if var_thresh_sent == "None":
+    var_thresh_sent=None
+else:
+    var_thresh_sent= ast.literal_eval(sys.argv[11])
+    var_thresh_sent=torch.tensor(var_thresh_sent)
+    print(var_thresh_sent)
+ref_point =  ast.literal_eval(sys.argv[12])
 
 warnings.filterwarnings('ignore')
 
@@ -18,8 +40,6 @@ from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume, full_hypervolume
 from qpots.utils.utils import posterior_mean_fill
-
-import torch
 from qpots.function import Function
 from botorch.utils.transforms import unnormalize
 
@@ -29,26 +49,26 @@ device = torch.device("cpu")
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
     {
-        "ntrain": 20,
-        "iters": 100,
+        "ntrain": ntrain_sent,
+        "iters": iters_sent,
         "reps": 20,
-        "q": 4,
+        "q": q_sent,
         "wd": "..",
-        "ref_point": torch.tensor([-18.0, -6.0]),
-        "dim": 2,
-        "nobj": 2,
-        "ncons": 0,
+        "ref_point": torch.tensor(ref_point),
+        "dim": dim_sent,
+        "nobj": nobj_sent,
+        "ncons": ncons_sent,
         "nystrom": 0,
         "nychoice": "pareto",
         "ngen": 10,
-        "mt": 0,
-        "partial_info": 0,
-        "variance_threshold": None, #.0012 : torch.tensor([.0012,.0012]) NEW:torch.tensor([.5,.5])
+        "mt": mtgp_sent,
+        "partial_info": partial_sent,
+        "variance_threshold": var_thresh_sent, #.0012 : torch.tensor([.0012,.0012]) NEW:torch.tensor([.5,.5])
     }
 )
 
 # Set up problem
-tf = Function('branincurrin', dim=args["dim"], nobj=args["nobj"])
+tf = Function(func_sent, dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
 
@@ -165,4 +185,4 @@ if args["partial_info"]==1:
     train_y_filled=posterior_mean_fill(gps)
     np.save(f"{args['wd']}/BC_{tag}_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
     np.save(f"{args['wd']}/BC_{tag}_task_id.npy", task_id.detach().cpu().numpy()) #9/15
-    np.save(f"{args['wd']}/BC_{tag}_iteration_tracker.npy", iteration_tracker) #9/15
+    np.save(f"{args['wd']}/BC_{tag}_iteration_tracker.npy", np.array(iteration_tracker,dtype=int)) #9/15

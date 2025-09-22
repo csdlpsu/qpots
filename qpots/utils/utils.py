@@ -3,6 +3,7 @@ from torch import Tensor
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
+from botorch.utils.transforms import standardize
 from sklearn.neighbors import KernelDensity
 from scipy.spatial.distance import cdist
 import argparse
@@ -289,18 +290,25 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double())
         new_variance = new_model.posterior(selected_candidates).variance
         
-        #9/15 Testing normalization between 0 and 1 for variance
-        normalized_variance=minmax_scale(new_variance)
-        print(normalized_variance)
-
         #Variance thresholding
         task_ids = torch.full_like(new_variance,float('nan'))
+        #9/17 Testing standardization with mean 0 std 1 for variance
+        do_standardize=True #Just using for testing, when we decide which to use get rid of this
+        if do_standardize:
+            standardized_variance=standardize(new_variance)
+            print("Standardized_Variance: ",standardized_variance)
+            mask = standardized_variance>thresh.unsqueeze(0) #NEW mask for standardized variance
+        else:
+        #9/15 Testing normalization between 0 and 1 for variance
+            normalized_variance=minmax_scale(new_variance)
+            print("Normalized_Variance: ",normalized_variance)
+            mask = normalized_variance>thresh.unsqueeze(0) #NEW mask for normalized variance
+
+        
         #print("Threshold: ",thresh)
         #print("new_variance:\n",new_variance)
-
-
         #mask = new_variance>thresh.unsqueeze(0) #OLD MASK
-        mask = normalized_variance>thresh.unsqueeze(0) #NEW mask for normalized variance
+        
         tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
         task_ids[mask]=tasks_stacked[mask]
         #checking if any rows are full of nans and removing them:
