@@ -3,6 +3,7 @@ from botorch.test_functions.multi_objective import (
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
     ZDT3, DiscBrake, MW7, OSY, WeldedBeam
 )
+from examples.Fall_25_custom_functions import MultiFidelityCurrin, MultiFidelityForrester #Extra Multi-Fidelity Test functions 9/29
 from botorch.test_functions.synthetic import Branin
 from torch import Tensor
 from typing import Callable, Optional
@@ -97,6 +98,8 @@ class Function:
             "osy": lambda: OSY(negate=True),
             "weldedbeam": lambda: WeldedBeam(negate=True),
             "branin": lambda: Branin(negate=True),
+            "mfcurrin": lambda: MultiFidelityCurrin(negate=False),
+            "mfforrester": lambda: MultiFidelityForrester(negate=True),
         }
 
         if self.name not in func_map:
