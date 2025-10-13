@@ -56,6 +56,19 @@ if func=="branincurrin":
 elif func=="zdt3":
     file_name="zdt3"
     test_function_tag="ZDT3"
+elif func=="discbrake":
+    file_name="unconstrained_branin_currin"
+    test_function_tag="discbrake"
+elif func=="DTLZ1":
+    file_name="unconstrained_branin_currin"
+    test_function_tag="DTLZ1"
+elif func=="DTLZ2":
+    file_name="unconstrained_branin_currin"
+    test_function_tag="DTLZ2"
+elif func=="weldedbeam":
+    file_name="unconstrained_branin_currin"
+    test_function_tag="weldedbeam"
+    
 
 multitask=args.use_mtgp
 if multitask:
@@ -105,6 +118,9 @@ if partial_info is True:
     iteration_tracker_all=[]
 
 i=0
+print(num_tests)
+print(test_function_tag)
+print(type_tag)
 for manual_seed in range(num_tests):
     
     if multi_variance_testing:
@@ -134,6 +150,9 @@ for manual_seed in range(num_tests):
         iteration_tracker_all.append(iteration_tracker)
 
     if num_tests>1:
+        print(num_tests)
+        print(test_function_tag)
+        print(type_tag)
         np.save(f"../{test_function_tag}_{type_tag}_train_y_all.npy", np.array(train_y_all, dtype=object))
         np.save(f"../{test_function_tag}_{type_tag}_train_x_all.npy", np.array(train_x_all, dtype=object))
         np.save(f"../{test_function_tag}_{type_tag}_hv_all.npy", np.array(hv_all, dtype=object))

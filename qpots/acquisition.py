@@ -238,11 +238,9 @@ class Acquisition:
         """
         torch.manual_seed(1024 + seed_iter)
 
-        
         model=gps.models[0]
         Ys_=[]
         for task in range(self.nobj+self.ncons):
-            
             task_ids=task*torch.ones(x.shape[0],1)
             x_norm=normalize(x,gps.bounds)
             x_mt=torch.cat([x_norm,task_ids],dim=-1)
@@ -251,7 +249,6 @@ class Acquisition:
             
             Ys_.append(sample)
         
-        #9/1 need new unstandardize that ignores NaNs (implemented 9/2)
         Ys_ = unstandardize_ignore_nan(torch.cat(Ys_, -1), gps.train_y.to(self.device))
         if torch.isnan(Ys_).any():
             print("NaNs detected in Ys:")
@@ -284,17 +281,22 @@ class Acquisition:
             Additional arguments for customization, including:
             
             - ``nystrom`` (int): Whether to use the Nystrom approximation (1 for yes, 0 for no).
-            - ``iters`` (int): Number of iterations for approximation.
+            - ``iters`` (int): Number of iterations used in the Nystrom approximation.
             - ``nychoice`` (str): Column selection method for the Nystrom approximation.
-            - ``dim`` (int): Dimensionality of the problem.
-            - ``ngen`` (int): Number of generations for NSGA-II optimization.
+            - ``dim`` (int): Dimensionality of the input space.
+            - ``ngen`` (int): Number of generations for the NSGA-II optimization.
             - ``q`` (int): Number of candidates to select.
+            - ``mt`` (int): Whether to use MultiTaskGP for posterior sampling (1 for yes, 0 for no).
+            - ``partial_info`` (int): Whether to perform candidate selection using partial information (1 for yes, 0 for no).
+            - ``variance_threshold`` (float, optional): Variance threshold used during partial-information selection.
 
         Returns
         -------
-        Tensor
-            A tensor containing the selected candidate points after Pareto Optimal 
-            Thompson Sampling.
+        Tensor or Tuple[Tensor, Tensor]
+            - If ``partial_info == 0``: A normalized tensor of selected candidate points after Pareto Optimal 
+            Thompson Sampling..
+            - If ``partial_info == 1``: A tuple containing the normalized candidates and their
+            corresponding task IDs, ``(candidates, task_ids)``.
         """
         def track_pareto(res):
             pareto_set[0] = res.opt.get("X")
@@ -327,12 +329,12 @@ class Acquisition:
             )
         else:
             
-            if kwargs["mt"] == 0:
-                gp_posterior_ = lambda x: self._gp_posterior(
+            if kwargs["mt"] == 1:
+                gp_posterior_ = lambda x: self._mt_gp_posterior(
                     x.to(self.device), self.gps, seed_iter=iteration
                 )
             else:
-                gp_posterior_ = lambda x: self._mt_gp_posterior(
+                gp_posterior_ = lambda x: self._gp_posterior(
                     x.to(self.device), self.gps, seed_iter=iteration
                 )
             pymoo_func_gp = PyMooFunction(
@@ -350,17 +352,15 @@ class Acquisition:
                 seed=2430,
             )
         
-        if kwargs["partial_info"] == 0:
-            selected_candidates = select_candidates(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
-            )
-        #Testing new Partial Info 8/25
-        else:
+        if kwargs["partial_info"] == 1:
             selected_candidates, new_task_ids = select_candidates_partial_info(
                 self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["variance_threshold"]
             )
-            #print("Chosen Task IDs in aquisition:\n",new_task_ids)
             return normalize(selected_candidates, bounds), new_task_ids
+        else:
+            selected_candidates = select_candidates(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
+            )
         
         return normalize(selected_candidates, bounds)
 

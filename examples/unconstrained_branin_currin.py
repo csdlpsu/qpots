@@ -38,7 +38,7 @@ warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
-from qpots.utils.utils import expected_hypervolume, full_hypervolume
+from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill
 from qpots.function import Function
 from botorch.utils.transforms import unnormalize
@@ -71,13 +71,19 @@ args = dict(
 tf = Function(func_sent, dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
+if args["ncons"] > 0:
+    cons = tf.get_cons()
 
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(manual_seed)#OLD: 1023, NEW: 2046 (better pareto front)
 
 # set up the training points
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
-train_y = f(unnormalize(train_x, bounds))
+if args["ncons"] > 0:
+    train_y = f(unnormalize(train_x, bounds))
+    train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))]) # Stack constraints on top of objectives
+else:
+    train_y = f(unnormalize(train_x, bounds))
 full_y=train_y
 
 # fit the GP models
@@ -88,9 +94,12 @@ else:
     gps.fit_gp()
 
 # initialize 
-acq = Acquisition(tf, gps, device=device, q=args["q"])
+if args["ncons"] > 0:
+    acq = Acquisition(tf, gps, cons=cons, device=device, q=args["q"])
+else:
+    acq = Acquisition(tf, gps, device=device, q=args["q"])
 
-times, hvs, hvs_full = [], [], []
+times, hvs = [], []
 iteration_tracker=[]
 task_id=torch.arange(args["nobj"]+args["ncons"]).expand(args["ntrain"],args["nobj"]+args["ncons"]).reshape(-1,1)
 for i in range(args["iters"]):
@@ -114,6 +123,12 @@ for i in range(args["iters"]):
     #New_y, Need to bring this into qPOTS at some point, and fix it such that it actually does partial evaluations
     if args["partial_info"]==1:
         full_newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+        if args["ncons"] > 0:
+            full_newconsy = cons(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+
+            #Attaching constraints 
+            full_newy = torch.column_stack([full_newy.reshape(newx.shape[0], args["nobj"]),
+                                    full_newconsy.reshape(newx.shape[0], args["ncons"])])
         
         newy = torch.full_like(full_newy, float('nan'))
     
@@ -129,11 +144,13 @@ for i in range(args["iters"]):
 
     else:
         newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
-
+        if args["ncons"] > 0:
+            newconsy = cons(unnormalize(newx.reshape(-1, args["dim"]), bounds))
+            newy = torch.column_stack([newy.reshape(args["q"], args["nobj"]),
+                                    newconsy.reshape(args["q"], args["ncons"])])
+    
     hv, pf = expected_hypervolume(gps, ref_point=args['ref_point'])
-    hv_full, _ = full_hypervolume(gps, full_y, ref_point=args['ref_point'])
     hvs.append(hv)
-    hvs_full.append(hv_full)
         
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
@@ -157,24 +174,22 @@ for i in range(args["iters"]):
                 tag="joint"
         else:
             tag="var_thresh"
-        np.save(f"{args['wd']}/BC_{tag}_train_x.npy", train_x)
-        np.save(f"{args['wd']}/BC_{tag}_train_y.npy", train_y)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_train_x.npy", train_x)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_train_y.npy", train_y)
         hvs_tensor = torch.stack(hvs)
-        np.save(f"{args['wd']}/BC_{tag}_hv.npy", hvs_tensor.detach().cpu().numpy())
-        hvs_full_tensor = torch.stack(hvs_full)
-        np.save(f"{args['wd']}/BC_{tag}_hv_full.npy", hvs_full_tensor.detach().cpu().numpy())
-        np.save(f"{args['wd']}/BC_{tag}_pareto_front.npy", pf.detach().cpu().numpy())
-        np.save(f"{args['wd']}/BC_{tag}_times.npy", times)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_hv.npy", hvs_tensor.detach().cpu().numpy())
+        np.save(f"{args['wd']}/{func_sent}_{tag}_pareto_front.npy", pf.detach().cpu().numpy())
+        np.save(f"{args['wd']}/{func_sent}_{tag}_times.npy", times)
         if args["partial_info"]==1:
-            np.save(f"{args['wd']}/BC_{tag}_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
+            np.save(f"{args['wd']}/{func_sent}_{tag}_full_y.npy", full_y) #Full y is without the NaNs, using for pareto sorting later
     else:
         tag="Model_list"
         gps.fit_gp()
-        np.save(f"{args['wd']}/BC_{tag}_train_x.npy", train_x)
-        np.save(f"{args['wd']}/BC_{tag}_train_y.npy", train_y)
-        np.save(f"{args['wd']}/BC_{tag}_hv.npy", hvs)
-        np.save(f"{args['wd']}/BC_{tag}_times.npy", times)
-        np.save(f"{args['wd']}/BC_{tag}_pareto_front.npy", pf.detach().cpu().numpy())
+        np.save(f"{args['wd']}/{func_sent}_{tag}_train_x.npy", train_x)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_train_y.npy", train_y)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_hv.npy", hvs)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_times.npy", times)
+        np.save(f"{args['wd']}/{func_sent}_{tag}_pareto_front.npy", pf.detach().cpu().numpy())
 
     t2 = time.time()
     times.append(t2 - t1)
@@ -183,6 +198,6 @@ for i in range(args["iters"]):
 #New addition to fill with the means at the locations where train_y is NaN
 if args["partial_info"]==1:
     train_y_filled=posterior_mean_fill(gps)
-    np.save(f"{args['wd']}/BC_{tag}_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
-    np.save(f"{args['wd']}/BC_{tag}_task_id.npy", task_id.detach().cpu().numpy()) #9/15
-    np.save(f"{args['wd']}/BC_{tag}_iteration_tracker.npy", np.array(iteration_tracker,dtype=int)) #9/15
+    np.save(f"{args['wd']}/{func_sent}_{tag}_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
+    np.save(f"{args['wd']}/{func_sent}_{tag}_task_id.npy", task_id.detach().cpu().numpy()) #9/15
+    np.save(f"{args['wd']}/{func_sent}_{tag}_iteration_tracker.npy", np.array(iteration_tracker,dtype=int)) #9/15

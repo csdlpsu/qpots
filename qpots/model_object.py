@@ -115,12 +115,27 @@ class ModelObject:
                 fit_gpytorch_mll(mll)
     
     def fit_multitask_gp(self):
+        """
+        Fit a MultiTask Gaussian Process (GP) model for objectives and constraints.
+
+        This method constructs and fits a single `MultiTaskGP` model that jointly models
+        all objectives and constraints. Missing (NaN) target values are ignored during
+        training, and each input is augmented with a task index.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+
         print("Fitting MultiTaskGP", flush=True)
         
-        #9/3 - Updating the train_x and y adjustments for MTGP
         num_inputs, dim = self.train_x.shape
         
-        #Initial training data :
+        #Initial training data:
         x_init = self.train_x[:self.ntrain].unsqueeze(1).expand(-1, self.nobj+self.ncons, -1).reshape(-1, dim)
         train_y_mt = self.standardize_ignore_nan(self.train_y)[:self.ntrain].reshape(-1,1)
         
@@ -130,34 +145,17 @@ class ModelObject:
         #Additional training data:
         if num_inputs > self.ntrain:
             new_x=self.train_x[self.ntrain:]
-            #print("Fitting new_x post training",new_x)
             new_y=self.standardize_ignore_nan(self.train_y)[self.ntrain:]
-            #print("Fitting new_y post training (standardized)",new_y)
             nan_mask = ~torch.isnan(new_y)
-            #print("Fitting nan_mask ",nan_mask)
             rows, tasks = nan_mask.nonzero(as_tuple=True) 
-            #print("Fitting rows and tasks",rows,tasks)
-            if rows.numel() > 0: #Just in case there are no new values (might be able to delete because I am filtering empty rows eleswhere)
+    
+            if rows.numel() > 0: 
                 new_x = new_x[rows]
-                #print("Fitting new_x post new_x[rows]",new_x)
                 new_task_ids = tasks.unsqueeze(1)
-                #print("Chosen Task IDs in model_object fit_gp:\n",new_task_ids)
                 new_x_mt = torch.cat([new_x,new_task_ids],dim=-1)
                 train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0)
-
                 train_y_mt=torch.cat([train_y_mt,new_y[rows, tasks].reshape(-1,1)])
 
-        # 9/8 Testing for constraint handling
-        """
-        print(">> Entering fit_multitask_gp")
-        print("train_x_mt shape:", train_x_mt.shape)
-        print("train_y_mt shape:", train_y_mt.shape)
-        print("train_x_mt example:",train_x_mt[:6])
-        print("train_y example:", standardize(self.train_y)[:6])
-        print("train_y_mt example:", train_y_mt[:6])
-        """
-
-        #Testing 8/25 Using Matern 5/2 Kernel 
         custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
 
         model = MultiTaskGP(
@@ -171,21 +169,6 @@ class ModelObject:
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         self.mlls.append(mll)
         fit_gpytorch_mll(mll)
-        print("Fitting successful")
-
-        self.counter(train_x_mt)
-        
-    def counter(self,train_x_mt):
-        objective_indices = train_x_mt[:, -1].long()
-        #print("iteration added Task IDs in model_object:\n",train_x_mt[40:, -1])
-        total_evals_per_objective = torch.zeros(self.nobj+self.ncons, dtype=torch.int64)
-        
-        for obj in range(self.nobj+self.ncons):
-            total_evals_per_objective[obj] = (objective_indices == obj).sum()
-
-        print("Total evaluations per objective:", total_evals_per_objective)
-        #return total_evals_per_objective
-
 
     def fit_gp_no_variance(self, single_objective=False):
         """
@@ -233,14 +216,19 @@ class ModelObject:
 
                 fit_gpytorch_mll(mll)
 
-    #Added 8/29 for partial information with train_y
     def standardize_ignore_nan(self, Y: torch.Tensor) -> torch.Tensor:
         """
         Standardize Y along dim=0 ignoring NaNs.
         NaNs remain in place.
+        Parameters
+        ----------
+        Y : torch.Tensor
+            Input tensor to be standardized.
+
         Returns
         -------
-        standardized Y tensor
+        torch.Tensor
+            Standardized tensor with NaN values preserved.
         """
         mean = torch.nanmean(Y, dim=0, keepdim=True)
 

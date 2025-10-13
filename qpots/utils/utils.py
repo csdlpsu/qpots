@@ -33,8 +33,6 @@ def unstandardize(Y: Tensor, train_y: Tensor) -> Tensor:
     std = train_y.std(dim=0)
     return Y * std + mean
 
-#Added 9/2 to unstandardize when train_y has NaN values in it for partial information
-#Can probably replace the normal unstandardize, because it works (tested) with both NaN and no NaN
 def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
     """
     Reverse the standardization of output `Y` using the mean and standard deviation 
@@ -77,10 +75,8 @@ def expected_hypervolume(
         - hypervolume_value (float): The computed hypervolume.
         - pareto_front (torch.Tensor): The Pareto front tensor.
     """
-    #9/8, filling the train_y before using it for the HV calculations, so partial info points can be used (replaceing gps.train_y with train_y_filled (there should be no NaN in the filled, but keeping the NaN checker for safe redundancy as of now))
     train_y_filled=posterior_mean_fill(gps)
     
-    #Edited for NaN on 9/2 (only max, not min)
     nan_mask = ~torch.isnan(train_y_filled[..., :gps.nobj]).any(dim=1)
     
     if min:
@@ -99,7 +95,6 @@ def expected_hypervolume(
             hypervolume_value = hv_calculator.compute(-1 * pareto_front)
             return hypervolume_value, pareto_front
     else:
-        #Changed 9/2
         if gps.ncons > 0:
             is_feas = (train_y_filled[..., -gps.ncons:] >= 0).all(dim=-1)
             valid_mask = is_feas & nan_mask
@@ -107,31 +102,11 @@ def expected_hypervolume(
 
             bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
-        #Changed 9/2
         else:
             Y_valid = train_y_filled[nan_mask, :gps.nobj]
+            
             bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
             return bd1.compute_hypervolume(), bd1.pareto_Y
-
-#9/10 using hypervolume of the real for plotting purposes only   
-def full_hypervolume(
-    gps: ModelObject, train_y_filled, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False
-) -> Tuple[float, Tensor]:
-
-    nan_mask = ~torch.isnan(train_y_filled[..., :gps.nobj]).any(dim=1)
- 
-    if gps.ncons > 0:
-        is_feas = (train_y_filled[..., -gps.ncons:] >= 0).all(dim=-1)
-        valid_mask = is_feas & nan_mask
-        Y_valid = train_y_filled[valid_mask]
-
-        bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
-        return bd1.compute_hypervolume(), bd1.pareto_Y
-    else:
-        Y_valid = train_y_filled[nan_mask, :gps.nobj]
-        bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
-        return bd1.compute_hypervolume(), bd1.pareto_Y
-
 
 def gen_filtered_cands(
     gps: ModelObject, cands: Tensor, ref_point: Tensor = torch.tensor([0.0, 0.0]), kernel_bandwidth: float = 0.05
@@ -173,7 +148,6 @@ def gen_filtered_cands(
 
     return cands_fil
 
-
 def select_candidates(
     gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None
 ) -> Tensor:
@@ -206,121 +180,104 @@ def select_candidates(
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     return selected_candidates
 
-def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None
+def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None, rescaling: str = "_"
 ) -> Tensor:
     """
-    Select candidates from the Pareto-optimal set.
+    Select candidates from the Pareto-optimal set using partial information.
+
+    This function selects `q` candidate points from a given Pareto-optimal set and assigns
+    tasks for evaluation. Task selection can be either random or based on a variance threshold.
+    If `thresh` is provided, tasks with posterior variance above the threshold are chosen.
+    Otherwise, tasks are selected randomly. Any candidates with all-NaN task assignments
+    are removed.
 
     Parameters
     ----------
     gps : ModelObject
-        Gaussian Process models.
+        Object containing Gaussian Process models, including training data and number of objectives/constraints.
     pareto_set : numpy.ndarray
-        Pareto-optimal set of solutions.
+        Pareto-optimal set of solutions. Shape `[num_points, num_variables]`.
     device : torch.device
-        Device to store the selected candidates.
+        Device to store the selected candidates (CPU or GPU).
     q : int, optional
         Number of candidates to select. Defaults to 1.
     seed : int, optional
-        Random seed for sampling.
+        Random seed for reproducibility when selecting tasks randomly or applying variance thresholding.
     thresh : float, optional
-        Variance threshold value to choose tasks. 
-        If left blank, defaults to randomly choosing tasks.
+        Variance threshold for selecting tasks. If None, tasks are chosen randomly.
+    rescaling : str, optional
+        Method to rescale variance for thresholding. Options are:
+        - "_" : no rescaling (raw variance)
+        - "std" : standardize to mean 0, std 1
+        - "norm" : normalize to [0, 1]
 
     Returns
     -------
-    torch.Tensor
-        Selected candidate points.
-        Selected task IDs
+    Tuple[torch.Tensor, torch.Tensor]
+        - `selected_candidates`: Tensor of shape `[num_selected, num_variables]` containing the chosen candidate points.
+        - `task_ids`: Tensor of shape `[num_selected, num_tasks]` indicating which tasks are selected for each candidate.
     """
-    #if seed is not None:
-    #    torch.manual_seed(seed)
-    
-    #Original Distance Heuristic (Chooses points):
 
     D = cdist(pareto_set, gps.train_x.numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     
-    #9/2 Bug Testing
-    #print("D shape:", D.shape)
     if pareto_set.shape[0]<=q:
-        print("WARNING Pareto Set post NSGA-II is small, not great selection diversity")
-       
+        print("WARNING Pareto Set from NSGA-II is smaller than number of batch points")
 
-
-    # 9/1/25 - Selecting a random Task
-    
     model=gps.models[0]
     num_inputs=selected_candidates.shape[0]
     
-    num_outputs=gps.nobj+gps.ncons #only using objectives for task_IDS, evaluating all constraints
+    num_outputs=gps.nobj+gps.ncons 
     if thresh is None:
         print("Random Task Choice:")
-        #task_ids = torch.randint(0, num_outputs, (q,))
-        # start with all NaNs
-        #9/9/25 replaceing q with num_inputs, such that if the NSGA-II pareto set is too small, it will still work and just select less points
+    
         task_ids = torch.full((num_inputs, num_outputs), float("nan")).double()
-
         tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
 
-        # random mask: include/exclude tasks per row randomly
         mask = torch.randint(0, 2, (num_inputs, num_outputs)).bool()
-
         task_ids[mask] = tasks_stacked[mask].double()
 
         # remove rows that are all NaN
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
         task_ids = task_ids[nan_mask]
         selected_candidates = selected_candidates[nan_mask]
-        #print("Chosen Task IDs:\n",task_ids)
 
     else:
         print("Variance Thresholding Task Choice")
         if seed is not None:
             torch.manual_seed(seed)
 
-        #9/3 Variance Thresholding task selection 
-        #Appending Task_IDs for fantasizing on a MultiTaskGP
         task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
         new_x_mt=torch.cat([selected_candidates.repeat(num_outputs,1),task_ids],dim=-1).double()
-        #Just pulling from the variance, and the y given for the fantasizing does not affect it
         rand_y_mt=torch.rand(num_inputs,num_outputs).double().T.reshape(-1, 1).double() 
-        #Fantasizing
-        new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double())
+    
+        new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double()) #Fantasizing
         new_variance = new_model.posterior(selected_candidates).variance
         
-        #Variance thresholding
         task_ids = torch.full_like(new_variance,float('nan'))
-        #9/17 Testing standardization with mean 0 std 1 for variance
-        do_standardize=True #Just using for testing, when we decide which to use get rid of this
-        if do_standardize:
+        
+        if rescaling == "std": #scaling variance to a mean of 0 std of 1 for thresholding only
             standardized_variance=standardize(new_variance)
             print("Standardized_Variance: ",standardized_variance)
-            mask = standardized_variance>thresh.unsqueeze(0) #NEW mask for standardized variance
-        else:
-        #9/15 Testing normalization between 0 and 1 for variance
+            mask = standardized_variance>thresh.unsqueeze(0) 
+        elif rescaling == "norm": #scaling variance between 0 and 1 for thresholding only
             normalized_variance=minmax_scale(new_variance)
             print("Normalized_Variance: ",normalized_variance)
-            mask = normalized_variance>thresh.unsqueeze(0) #NEW mask for normalized variance
-
-        
-        #print("Threshold: ",thresh)
-        #print("new_variance:\n",new_variance)
-        #mask = new_variance>thresh.unsqueeze(0) #OLD MASK
+            mask = normalized_variance>thresh.unsqueeze(0) 
+        else:
+            mask = new_variance>thresh.unsqueeze(0)
         
         tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
         task_ids[mask]=tasks_stacked[mask]
-        #checking if any rows are full of nans and removing them:
+        # Removing any empty rows
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
         task_ids = task_ids[nan_mask]
         selected_candidates = selected_candidates[nan_mask]
-        #print("Chosen Task IDs in utils:\n",task_ids)
-
  
     return selected_candidates, task_ids
 
-#9/15 Testing normalization between 0 and 1 for variance
+
 def minmax_scale(x, dim=None,eps=1e-12):
     """
     Rescale a tensor to [0, 1] along the each column (task).
@@ -339,13 +296,27 @@ def minmax_scale(x, dim=None,eps=1e-12):
     
     return (x - x_min) / (x_max - x_min + eps)
 
-#9/3 Adding a method to fill the NaN values in train_y with their posterior means at said location
+
 def posterior_mean_fill(gps: ModelObject):
     """
-    After partial information, train_y will have NaN values, which makes it impossible to extract the true pareto frontier.
+    Fill missing values in training targets using the GP posterior mean.
+
+    After partial-information updates, `gps.train_y` may contain NaN entries,
+    which makes it impossible to compute metrics like the true Pareto front directly.
+    This function replaces all NaN entries with the corresponding posterior mean
+    predicted by the MultiTaskGP model for that input and task.
+
+    Parameters
+    ----------
+    gps : ModelObject
+        Object containing the MultiTaskGP model(s) and training data, including
+        `train_x`, `train_y`, number of objectives (`nobj`), and constraints (`ncons`).
+
     Returns
     -------
-    full_train_y, a tensor that fills all NaN's from train_y with the posterior mean of the model at said location
+    torch.Tensor
+        A tensor of the same shape as `gps.train_y` with NaNs replaced by the
+        posterior mean for each missing entry.
     """
     mtgp=gps.models[0]
     full_train_y = gps.train_y.clone().detach()

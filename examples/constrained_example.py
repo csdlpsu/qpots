@@ -18,34 +18,50 @@ from qpots.function import Function
 import torch
 from botorch.utils.transforms import unnormalize, normalize
 
+test_function_tag="weldedbeam"
+if test_function_tag =="discbrake":
+    dim_pass=4
+    nobj_pass=2
+    ntrain_pass=10*dim_pass
+    ncons_pass=4
+    ref_pass=[5.8, 4.0]
+    var_pass=[-0.5,-0.5]
+elif test_function_tag =="weldedbeam":
+    dim_pass=4
+    nobj_pass=2
+    ntrain_pass=10*dim_pass
+    ncons_pass=4
+    ref_pass=[40, 10]
+    var_pass=[-0.5,-0.5]
+
 device = torch.device("cpu")
 args = dict(
         {
-            "ntrain": 40,
+            "ntrain": ntrain_pass,
             "iters": 50,
             "reps": 20,
-            "q": 4,
+            "q": 2,
             "wd": "..",
-            "ref_point": -1*torch.tensor([5.8, 4.0]),
-            "dim": 4,
-            "nobj": 2,
-            "ncons": 4,
+            "ref_point": -1*torch.tensor(ref_pass),
+            "dim": dim_pass,
+            "nobj": nobj_pass,
+            "ncons": ncons_pass,
             "nystrom": 0,
             "nychoice": "pareto",
             "ngen": 10,
             "mt": 1,
-            "partial_info": 1,
-            "variance_threshold": torch.tensor([9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5]), #9.790e-5
+            "partial_info": 0,
+            "variance_threshold": None, #torch.tensor([9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5,9.790e-5])
         }
     )
 
-tf = Function('discbrake', dim=args["dim"], nobj=args["nobj"])
+tf = Function(test_function_tag, dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
 bounds = tf.get_bounds()
 cons = tf.get_cons()
 
 os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1023)
+torch.manual_seed(1023) #1023
 
 train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
 train_y = f(unnormalize(train_x, bounds))
@@ -76,7 +92,7 @@ for i in range(args["iters"]):
     
 
     if args["partial_info"]==1:
-        #Getting full cons and 
+        #Getting full cons and y
         full_newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
         full_newconsy = cons(unnormalize(newx.reshape(-1, args["dim"]), bounds))
 
@@ -109,6 +125,7 @@ for i in range(args["iters"]):
 
     train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
     train_y = torch.row_stack([train_y, newy])
+    
     if args["partial_info"]==1:
         full_y=torch.row_stack([full_y, full_newy])
 

@@ -20,17 +20,32 @@ from qpots.function import Function
 from botorch.utils.transforms import unnormalize
 
 device = torch.device("cpu")
-test_function_tag="mfcurrin"
+test_function_tag="DTLZ2"
+print(test_function_tag)
 if test_function_tag =="mfcurrin":
     dim_pass=2
     nobj_pass=2
     ntrain_pass=20
-    ref_pass=[20,20]
+    ref_pass=[-20,-20]
+    var_pass=[1,1]
 elif test_function_tag =="mfforrester":
     dim_pass=1
     nobj_pass=3
     ntrain_pass=10
-    ref_pass=[20,20,20]
+    ref_pass=[-20,-20,-20]
+    var_pass=[1,1,1]
+elif test_function_tag =="DTLZ2":
+    dim_pass=4
+    nobj_pass=3
+    ntrain_pass=30
+    ref_pass=[-20,-20,-20]
+    var_pass=[-0.5,-0.5,-0.5]
+elif test_function_tag =="zdt3":
+    dim_pass=2
+    nobj_pass=2
+    ntrain_pass=10*dim_pass
+    ref_pass=[-20,-20]
+    var_pass=[-0.5,-0.5]
 
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
@@ -49,7 +64,7 @@ args = dict(
         "ngen": 10,
         "mt": 0,
         "partial_info": 0,
-        "variance_threshold": 0, #
+        "variance_threshold": None, #torch.tensor(var_pass)
     }
 )
 
@@ -117,7 +132,7 @@ for i in range(args["iters"]):
     else:
         newy = f(unnormalize(newx.reshape(-1, args["dim"]), bounds))
 
-    hv, pf = expected_hypervolume(gps, ref_point=args['ref_point'])
+    hv, pf = expected_hypervolume(gps, ref_point=args['ref_point'],negate=True)
     hv_full, _ = full_hypervolume(gps, full_y, ref_point=args['ref_point'])
     hvs.append(hv)
     hvs_full.append(hv_full)
