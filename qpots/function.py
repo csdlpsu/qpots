@@ -1,7 +1,7 @@
 from botorch.test_functions.multi_objective import (
     BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
 )
 from examples.Fall_25_custom_functions import MultiFidelityCurrin, MultiFidelityForrester #Extra Multi-Fidelity Test functions 9/29
 from botorch.test_functions.synthetic import Branin
@@ -92,6 +92,7 @@ class Function:
             "vehicle": lambda: VehicleSafety(negate=True),
             "carside": lambda: CarSideImpact(negate=True),
             "zdt3": lambda: ZDT3(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "zdt2": lambda: ZDT2(dim=self.dim, num_objectives=self.nobj, negate=True),
             "constrainedbc": lambda: ConstrainedBraninCurrin(negate=True),
             "discbrake": lambda: DiscBrake(),
             "mw7": lambda: MW7(dim=self.dim, negate=True),
