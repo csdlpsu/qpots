@@ -10,7 +10,7 @@ from botorch.acquisition.objective import GenericMCObjective
 from botorch.utils.sampling import draw_sobol_samples, sample_simplex
 from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
 from botorch.sampling.normal import SobolQMCNormalSampler
-from botorch.acquisition.multi_objective.parego import qLogNParEGO
+#from botorch.acquisition.multi_objective.parego import qLogNParEGO
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.utils import (
@@ -29,7 +29,7 @@ from botorch.acquisition.multi_objective.joint_entropy_search import (
 )
 from botorch.optim.optimize import optimize_acqf, optimize_acqf_list
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_candidates, select_candidates_partial_info
+from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_candidates, select_candidates_partial_info, select_candidates_total_correlation
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
@@ -239,7 +239,11 @@ class Acquisition:
         torch.manual_seed(1024 + seed_iter)
 
         model=gps.models[0]
-        Ys_=[]
+        #Do not need appending of task IDS for posterior sampling:
+        Ys_=model.posterior(normalize(x,gps.bounds)).sample() #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
+
+        #Old method, adapted from singletask
+        """
         for task in range(self.nobj+self.ncons):
             task_ids=task*torch.ones(x.shape[0],1)
             x_norm=normalize(x,gps.bounds)
@@ -248,11 +252,12 @@ class Acquisition:
             sample=model.posterior(x_mt).sample().squeeze(0)
             
             Ys_.append(sample)
-        
+
+
         Ys_ = unstandardize_ignore_nan(torch.cat(Ys_, -1), gps.train_y.to(self.device))
-        if torch.isnan(Ys_).any():
-            print("NaNs detected in Ys:")
-            print(Ys_)
+        """
+        Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
+        
         if self.ncons > 0:
             ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
             Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
@@ -353,8 +358,9 @@ class Acquisition:
             )
         
         if kwargs["partial_info"] == 1:
-            selected_candidates, new_task_ids = select_candidates_partial_info(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["variance_threshold"]
+            #12/31 Now using total_correlation for candidate selection
+            selected_candidates, new_task_ids = select_candidates_total_correlation(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["threshold"]
             )
             return normalize(selected_candidates, bounds), new_task_ids
         else:

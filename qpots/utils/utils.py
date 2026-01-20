@@ -9,8 +9,11 @@ from scipy.spatial.distance import cdist
 import argparse
 from typing import Tuple
 from qpots.model_object import ModelObject
+from qpots.utils.tc_utils import qmaximin 
 import numpy as np
 
+from itertools import combinations
+from typing import Iterable, Optional, Sequence, Tuple, Union, Dict, Any
 
 def unstandardize(Y: Tensor, train_y: Tensor) -> Tensor:
     """
@@ -53,6 +56,37 @@ def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) ->
     mean = torch.nanmean(train_y, dim=0)
     std = torch.from_numpy(np.nanstd(train_y.cpu().numpy(), axis=0, ddof=1)).to(train_y)
     return Y * std + mean
+
+#1/9/26
+def mtgp_posterior_mean_hypervolume(gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0])):
+    """
+        Compute the expected hypervolume based ONLY on MTGP model predictions.
+
+        Parameters
+        ----------
+        gps : ModelObject
+            The multi-objective GP models.
+        ref_point : torch.Tensor, optional
+            Reference point for hypervolume calculation.
+        Returns
+        -------
+        
+        """
+    model=gps.models[0]
+    train_x=gps.train_x
+    
+    task_ids = torch.arange(gps.nobj).repeat_interleave(train_x.shape[0]).unsqueeze(-1)
+    train_x_extended = train_x.repeat(gps.nobj, 1)
+    train_x_mt = torch.cat([train_x_extended,task_ids], dim=-1)  # (n*num_tasks, d+1)
+    #print("train_x_mt:\n",train_x_mt)
+    post = model.posterior(train_x_mt)
+    model_y=post.mean.reshape(train_x.shape[0],gps.nobj)
+    #print("model_y.shape:\n",model_y.shape)
+    #print("model_y:\n",model_y)
+
+    bd1 = FastNondominatedPartitioning(ref_point.double(), model_y.double())
+    hypervolume = bd1.compute_hypervolume()
+    return hypervolume
 
 def expected_hypervolume(
     gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False
@@ -174,7 +208,7 @@ def select_candidates(
     """
     if seed is not None:
         torch.manual_seed(seed)
-
+    print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
     D = cdist(pareto_set, gps.train_x.numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
@@ -217,13 +251,13 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         - `selected_candidates`: Tensor of shape `[num_selected, num_variables]` containing the chosen candidate points.
         - `task_ids`: Tensor of shape `[num_selected, num_tasks]` indicating which tasks are selected for each candidate.
     """
-
+    print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
     D = cdist(pareto_set, gps.train_x.numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
     selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
     
     if pareto_set.shape[0]<=q:
-        print("WARNING Pareto Set from NSGA-II is smaller than number of batch points")
+        print(f"WARNING Pareto Set from NSGA-II is smaller than number of batch points: {pareto_set.shape[0]}")
 
     model=gps.models[0]
     num_inputs=selected_candidates.shape[0]
@@ -277,6 +311,490 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
  
     return selected_candidates, task_ids
 
+############################################################################################################################################
+
+
+
+
+
+#Total Correlation work: 12/31
+def corr_and_total_correlation(
+    cov: torch.Tensor,
+    jitter: float = 1e-6,
+    eps: float = 1e-12,
+):
+    """
+    Compute task correlation matrix R and total correlation TC from an inter-task covariance matrix.
+
+    Args:
+        cov: (..., m, m) symmetric covariance matrix across m tasks (e.g., posterior Cov[f(x)]).
+        jitter: diagonal jitter added to R before Cholesky/logdet for numerical stability.
+        eps: clamp floor for variances to avoid divide-by-zero.
+
+    Returns:
+        R:  (..., m, m) correlation matrix.
+        TC: (...) total correlation in nats, TC = -0.5 * logdet(R).
+    """
+    # Standard deviations from diagonal
+    var = torch.diagonal(cov, dim1=-2, dim2=-1).clamp_min(eps)  # (..., m)
+    std = var.sqrt()
+
+    # Correlation matrix
+    with torch.no_grad():
+        R = cov / (std.unsqueeze(-1) * std.unsqueeze(-2))
+
+    # Stabilize and compute logdet via Cholesky: logdet(R) = 2 * sum(log(diag(L)))
+    m = R.shape[-1]
+    eye = torch.eye(m, device=R.device, dtype=R.dtype).expand(R.shape[:-2] + (m, m))
+    Rj = R + jitter * eye
+
+    L = torch.linalg.cholesky(Rj)
+    logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
+
+    with torch.no_grad():
+        TC = -0.5 * logdet
+    return R, TC
+
+
+# 1/7/26
+## Mutual Information: ##
+
+def _stable_logdet(A: np.ndarray, jitter: float = 1e-10, max_tries: int = 8) -> float:
+    """
+    Numerically stable log(det(A)) for (near) PSD matrices by adding diagonal jitter if needed.
+    Raises if it cannot make the matrix numerically positive definite.
+    """
+    A = np.asarray(A, dtype=float)
+    if A.ndim != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError(f"A must be square; got shape {A.shape}")
+
+    n = A.shape[0]
+    eye = np.eye(n, dtype=float)
+
+    j = float(jitter)
+    for _ in range(max_tries):
+        sign, ld = np.linalg.slogdet(A + j * eye)
+        if sign > 0 and np.isfinite(ld):
+            return float(ld)
+        j *= 10.0
+
+    raise np.linalg.LinAlgError(
+        "Could not compute a positive logdet even after adding jitter. "
+        "Covariance may be indefinite or extremely ill-conditioned."
+    )
+
+# Mutual Info
+def mutual_information_split_gaussian(
+    cov: np.ndarray,
+    S: Sequence[int],
+    *,
+    jitter: float = 1e-10,
+    base: float = np.e,
+) -> float:
+    """
+    Compute I(Y_S ; Y_{Sc}) under a multivariate Gaussian with covariance `cov`.
+
+    Parameters
+    ----------
+    cov : (K, K) array
+        Covariance matrix of Y.
+    S : sequence of ints
+        Indices in the subset S.
+    jitter : float
+        Diagonal jitter used for stable log-determinants.
+    base : float
+        Log base. Use base=2.0 for bits, base=np.e for nats.
+
+    Returns
+    -------
+    mi : float
+        Mutual information I(Y_S ; Y_{Sc}) in the chosen log base.
+    """
+    cov = np.asarray(cov, dtype=float)
+    if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
+        raise ValueError(f"cov must be square; got shape {cov.shape}")
+    K = cov.shape[0]
+
+    S = sorted(set(int(i) for i in S))
+    if any(i < 0 or i >= K for i in S):
+        raise ValueError(f"S contains out-of-range indices for K={K}: {S}")
+
+    Sc = [i for i in range(K) if i not in set(S)]
+    if len(S) == 0 or len(Sc) == 0:
+        return 0.0
+
+    cov_S = cov[np.ix_(S, S)]
+    cov_Sc = cov[np.ix_(Sc, Sc)]
+
+    ld_S = _stable_logdet(cov_S, jitter=jitter)
+    ld_Sc = _stable_logdet(cov_Sc, jitter=jitter)
+    ld_all = _stable_logdet(cov, jitter=jitter)
+
+    mi_nats = 0.5 * (ld_S + ld_Sc - ld_all)
+
+    if base == np.e:
+        return float(mi_nats)
+    else:
+        return float(mi_nats / np.log(base))
+
+# Brute Force Maximjze MI for set
+def argmax_mi_subset_bruteforce(
+    cov_or_samples: np.ndarray,
+    *,
+    subset_size: Optional[int] = None,
+    jitter: float = 1e-10,
+    base: float = np.e,
+    assume_samples: Optional[bool] = None,
+    deduplicate_complements: bool = True,
+    return_all_scores: bool = False,
+) -> Dict[str, Any]:
+    """
+    Brute-force search over subsets S to maximize I(Y_S ; Y_{Sc}) (Gaussian assumption).
+
+    You can pass either:
+      - cov_or_samples as a (K,K) covariance matrix, OR
+      - cov_or_samples as (N,K) samples (rows=samples), from which we estimate covariance.
+
+    Parameters
+    ----------
+    cov_or_samples : np.ndarray
+        (K,K) covariance OR (N,K) samples.
+    subset_size : int or None
+        If provided, restrict search to subsets with |S| == subset_size.
+        If None, searches all non-trivial subsets (excluding empty/full).
+    jitter, base : see above
+    assume_samples : bool or None
+        If None, auto-detect: (K,K) => covariance; otherwise => samples.
+    deduplicate_complements : bool
+        If subset_size is None, avoid evaluating both S and Sc by restricting to |S| <= floor(K/2).
+        This is safe because I(S;Sc) == I(Sc;S).
+    return_all_scores : bool
+        If True, returns a dict mapping subset tuples -> MI score (can be large: O(2^K)).
+
+    Returns
+    -------
+    result : dict with keys
+        - "S": tuple of indices for the best subset
+        - "Sc": tuple of indices for the complement
+        - "mi": best MI value
+        - "cov": covariance used
+        - optionally "scores": dict[(tuple)->float] if return_all_scores=True
+    """
+    if cov_or_samples.shape[-1]==2:
+        best_S=torch.randint(0,2,[1]).item()
+        best_Sc=1-best_S
+        out: Dict[str, Any] = {"S": best_S, "Sc": best_Sc}
+        print("K=2, exiting", out)
+        return out
+    
+    X = np.asarray(cov_or_samples, dtype=float)
+
+    if assume_samples is None:
+        assume_samples = not (X.ndim == 2 and X.shape[0] == X.shape[1])
+
+    if assume_samples:
+        if X.ndim != 2:
+            raise ValueError(f"Samples must be 2D (N,K); got shape {X.shape}")
+        # sample covariance (rowvar=False => columns are variables)
+        cov = np.cov(X, rowvar=False, bias=False)
+    else:
+        cov = X
+
+    cov = np.asarray(cov, dtype=float)
+    if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
+        raise ValueError(f"Covariance must be (K,K); got shape {cov.shape}")
+
+    K = cov.shape[0]
+    idx = list(range(K))
+
+    if subset_size is not None:
+        if not (1 <= subset_size <= K - 1):
+            raise ValueError(f"subset_size must be in [1, K-1]; got {subset_size} for K={K}")
+        sizes = [subset_size]
+    else:
+        # all non-trivial subsets
+        max_size = (K // 2) if deduplicate_complements else (K - 1)
+        sizes = list(range(1, max_size + 1))
+
+    best_S: Optional[Tuple[int, ...]] = None
+    best_mi = -np.inf
+    scores = {} if return_all_scores else None
+
+    for m in sizes:
+        for S in combinations(idx, m):
+            mi = mutual_information_split_gaussian(cov, S, jitter=jitter, base=base)
+            if return_all_scores:
+                scores[tuple(S)] = mi
+            if mi > best_mi:
+                best_mi = mi
+                best_S = tuple(S)
+    #print("BEST_S",best_S)
+    if best_S is None:
+        # This only happens if K < 2.
+        best_S = tuple()
+        best_mi = 0.0
+
+    best_S_set = set(best_S)
+    best_Sc = tuple(i for i in idx if i not in best_S_set)
+
+    out: Dict[str, Any] = {"S": best_S, "Sc": best_Sc, "mi": float(best_mi), "cov": cov}
+    if return_all_scores:
+        out["scores"] = scores
+    print(out)
+    return out
+
+
+
+def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None
+) -> Tensor:
+    """
+    HEADER
+    """
+    #Old Maxmin distance
+    #"""
+    print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
+    D = cdist(pareto_set, gps.train_x.numpy())
+    selected_indices = D.min(axis=-1).argsort()[-q:]
+    selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
+    #"""
+    #New Maxmin distance, 1/15, in tc_utils.py: 
+    #selected_candidates = qmaximin(gps.train_x, torch.tensor(pareto_set), q=q)
+
+    
+    if pareto_set.shape[0]<=q:
+        print(f"WARNING Pareto Set from NSGA-II is smaller than number of batch points: {pareto_set.shape[0]}")
+
+    model=gps.models[0]
+    dim=selected_candidates.shape[1]
+    #print("dim: ",dim)
+    num_outputs=gps.nobj+gps.ncons 
+    if thresh is None:
+        print("Random Task Choice:")
+    
+        task_ids = torch.full((q, num_outputs), float("nan")).double()
+        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+
+        mask = torch.randint(0, 2, (q, num_outputs)).bool()
+        task_ids[mask] = tasks_stacked[mask].double()
+
+        # remove rows that are all NaN
+        nan_mask = ~torch.isnan(task_ids).all(dim=1)
+        task_ids = task_ids[nan_mask]
+        selected_candidates = selected_candidates[nan_mask]
+
+    else:
+        print("\nTotal Correlation Thresholding Task Choice")
+        #print("Thresh: ",thresh,"\n")
+        #if seed is not None:
+        #    torch.manual_seed(seed)
+
+        
+        #Old TC
+        """
+        tc = [] # total correlation
+        R = [] # R Matrix
+        x_star=torch.tensor(pareto_set)
+        corr_ceoff = []
+        
+        for i in range(q):
+            #Using only the q batch points
+            post = model.posterior(selected_candidates[i].view(-1,2))
+            
+            #Using the whole Pareto Set
+            #post = model.posterior(x_star[i].view(-1,2))
+            with torch.no_grad():
+                cov = post.distribution.covariance_matrix  # 2x2 (materialized)
+            print("Model Covariance: \n", cov)
+           
+            R_, tc_ = corr_and_total_correlation(cov)
+            print("R: \n", R_)
+            print("TC: \n",tc_)
+ 
+            tc.append(tc_)
+            R.append(R_)
+        """ 
+        
+        #Method From Dr. R.
+        tc_i = []
+        eval_list=[]
+        for i in range(selected_candidates.shape[0]): #was range q, but NSGA-II front was getting too small????? BAD problem
+            post = model.posterior(selected_candidates[i].view(-1,dim))
+            with torch.no_grad():
+                cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
+
+            _, tc = corr_and_total_correlation(cov)
+            #tc = computeTC(x_new[i])
+           
+            tc_i.append(torch.abs(tc).item())
+            if torch.abs(tc) > thresh:
+                res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
+                #print("res from mi_subset_brute_force: ",res)
+                eval_subset=res["S"]
+                if isinstance(eval_subset, int):
+                    eval_subset = [eval_subset]
+                #print("eval_subset",eval_subset)
+                print("res['S']:", res["S"], type(res["S"]))
+                eval_list.append([
+                    i if i in eval_subset else -1
+                    for i in range(num_outputs)
+                ])
+                #print("eval_list",eval_list)
+            else:
+                #print("Full set: ", range(num_outputs))
+                eval_list.append(list(range(num_outputs)))
+        eval_tensor=torch.tensor(eval_list).double()
+            
+        
+        #TC_array = np.array([t.item() for t in tc_i])
+        print("All q TC's: \n",tc_i,"\n")
+        
+        #Old Testing of R
+        """
+        TC_tensor=torch.tensor(TC_array)
+        mask = TC_tensor>thresh
+        print("Mask:\n",mask)
+        
+        task_ids = torch.arange(num_outputs).repeat(num_inputs, 1)
+        print("task_ids full:\n",task_ids)
+        
+        Trues_idx = torch.nonzero(mask)
+        print("Indecies that are True:\n", Trues_idx)
+        
+        for idx in Trues_idx:
+            print("Index: ",idx.item())
+            R_current=R[idx.item()]
+            print("R Matrix:\n",R_current)
+            
+            j=0
+            while j<num_outputs:
+                i=0
+                while i<num_outputs:
+                    if i != j:
+                        print(f"R between {i} and {j}: {R_current[i][j]}")
+                    i+=1
+                j+=1
+        """
+        
+        #Selecting the tasks
+        #eval_subset is the MI identifies
+      
+        tasks_stacked = torch.arange(num_outputs).repeat(selected_candidates.shape[0], 1).double() #was using q instead of selected_candidates.shape[0], but NSGA-II issue
+        print("tasks_stacked:\n",tasks_stacked)
+        task_ids = torch.full_like(tasks_stacked,float('nan'))
+        #print("task_ids:\n",task_ids)
+        print("eval_tensor:\n",eval_tensor)
+        mask=tasks_stacked == eval_tensor
+        #print("mask:\n",mask)
+        task_ids[mask]=tasks_stacked[mask]
+        #print("task_ids:\n",task_ids)
+        #print("selected_candidates:\n",selected_candidates)
+    return selected_candidates, task_ids
+
+###Hypervolume Computation from Dr. R. 1/14
+def _augment_X_with_tasks(
+    X: torch.Tensor,  # (n, d) WITHOUT the task feature
+    num_tasks: int,
+    task_feature: int,
+) -> torch.Tensor:
+    """
+    Build the (n*num_tasks, d+1) design matrix expected by MultiTaskGP,
+    inserting a task index column at position `task_feature`.
+    """
+    if X.ndim != 2:
+        raise ValueError(f"Expected X to be 2D (n x d). Got shape {tuple(X.shape)}.")
+
+    n, d = X.shape
+    aug_dim = d + 1
+    tf = task_feature if task_feature >= 0 else aug_dim + task_feature
+    if not (0 <= tf < aug_dim):
+        raise ValueError(f"task_feature={task_feature} invalid for augmented dim {aug_dim}.")
+
+    # Repeat X in blocks: task 0 has rows [0:n], task 1 has rows [n:2n], etc.
+    X_rep = X.repeat(num_tasks, 1)  # (n*num_tasks, d)
+
+    # Task ids aligned with the blocks above
+    task_ids = (
+        torch.arange(num_tasks, device=X.device, dtype=X.dtype)
+        .repeat_interleave(n)
+        .unsqueeze(-1)
+    )  # (n*num_tasks, 1)
+
+    # Insert task column at index tf
+    X_aug = torch.cat([X_rep[..., :tf], task_ids, X_rep[..., tf:]], dim=-1)  # (n*num_tasks, d+1)
+    return X_aug
+
+def hypervolume_from_posterior_mean_mtgp(
+    mt_model,
+    X: torch.Tensor,                      # (n, d) base features (no task column)
+    task_feature: int,
+    *,
+    ref_point,
+    maximize,
+) -> torch.Tensor:
+    """
+    Compute hypervolume of the *posterior mean* vectors produced by a MultiTaskGP.
+
+    Args:
+        mt_model: fitted MultiTaskGP (task encoded as input feature).
+        X: (n, d) points at which to compute posterior mean for each task.
+        task_feature: index where the task column lives in the augmented input (d+1).
+        ref_point: reference point in objective space, length K (K inferred from this).
+        maximize: if False, treats objectives as minimization (internally negates).
+
+    Returns:
+        A scalar tensor: hypervolume of the non-dominated posterior-mean outcomes.
+    """
+    mt_model.eval()
+
+    # Infer K (#objectives/tasks) from ref_point
+    if not torch.is_tensor(ref_point):
+        ref_point = torch.tensor(ref_point)
+
+    # Move to model device/dtype
+    p = next(mt_model.parameters())
+    device, dtype = p.device, p.dtype
+    X = X.to(device=device, dtype=dtype)
+    ref_point = ref_point.to(device=device, dtype=dtype).view(-1)
+    K = ref_point.numel()
+
+    # Build long-format inputs and get posterior mean for each (x, task)
+    X_aug = _augment_X_with_tasks(X, num_tasks=K, task_feature=task_feature)  # (n*K, d+1)
+    post = mt_model.posterior(X_aug)
+    mean_flat = post.mean.squeeze(-1)  # (n*K,)
+
+    n = X.shape[0]
+    Y_mean = mean_flat.view(K, n).transpose(0, 1).contiguous()  # (n, K)
+
+    # Hypervolume assumes maximization. If minimizing, negate both.
+    if not maximize:
+        Y_mean = -Y_mean
+        ref_point = -ref_point
+
+    # Non-dominated subset of posterior means
+    nd_mask = is_non_dominated(Y_mean)
+    pareto_Y = Y_mean[nd_mask]
+
+    if pareto_Y.numel() == 0:
+        # Shouldn't happen unless n=0, but keep it safe:
+        return torch.zeros((), device=device, dtype=dtype)
+
+    hv = Hypervolume(ref_point=ref_point).compute(pareto_Y)
+    return hv
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+############################################################################################################################################
 
 def minmax_scale(x, dim=None,eps=1e-12):
     """
@@ -295,7 +813,6 @@ def minmax_scale(x, dim=None,eps=1e-12):
     x_max = x.max(dim=dim, keepdim=True).values if dim is not None else x.max()
     
     return (x - x_min) / (x_max - x_min + eps)
-
 
 def posterior_mean_fill(gps: ModelObject):
     """
@@ -327,7 +844,8 @@ def posterior_mean_fill(gps: ModelObject):
             task_idx = torch.full((X_missing.shape[0], 1), m, dtype=torch.long, device=gps.train_x.device)
             posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
             
-            full_train_y[missing_mask, m] = unstandardize_ignore_nan(posterior.mean,gps.train_y)[:, m]
+            #full_train_y[missing_mask, m] = unstandardize_ignore_nan(posterior.mean,gps.train_y)[:, m]
+            full_train_y[missing_mask, m] = posterior.mean[:, m]
             
     return full_train_y
 

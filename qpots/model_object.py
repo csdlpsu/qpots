@@ -5,6 +5,7 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 from gpytorch.kernels import ScaleKernel, MaternKernel
+from botorch.models.transforms.outcome import Standardize
 
 
 class ModelObject:
@@ -137,32 +138,46 @@ class ModelObject:
         
         #Initial training data:
         x_init = self.train_x[:self.ntrain].unsqueeze(1).expand(-1, self.nobj+self.ncons, -1).reshape(-1, dim)
-        train_y_mt = self.standardize_ignore_nan(self.train_y)[:self.ntrain].reshape(-1,1)
+        #train_y_mt = self.standardize_ignore_nan(self.train_y)[:self.ntrain].reshape(-1,1)
+        train_y_mt = self.train_y[:self.ntrain].reshape(-1,1)
+      
         
         task_ids_init = torch.arange(self.nobj+self.ncons).expand(self.ntrain,self.nobj+self.ncons).reshape(-1,1)
         train_x_mt = torch.cat([x_init,task_ids_init],dim=-1)
-
+        """
+        if num_inputs <= self.ntrain:
+            print("train_x_mt:\n",train_x_mt)
+            print("train_y_mt:\n",train_y_mt)
+        """
+        
         #Additional training data:
         if num_inputs > self.ntrain:
             new_x=self.train_x[self.ntrain:]
-            new_y=self.standardize_ignore_nan(self.train_y)[self.ntrain:]
+            #new_y=self.standardize_ignore_nan(self.train_y)[self.ntrain:]
+            new_y=self.train_y[self.ntrain:]
             nan_mask = ~torch.isnan(new_y)
             rows, tasks = nan_mask.nonzero(as_tuple=True) 
-    
+            
             if rows.numel() > 0: 
                 new_x = new_x[rows]
                 new_task_ids = tasks.unsqueeze(1)
                 new_x_mt = torch.cat([new_x,new_task_ids],dim=-1)
                 train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0)
                 train_y_mt=torch.cat([train_y_mt,new_y[rows, tasks].reshape(-1,1)])
-
-        custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
+                
+                #print("Past training")
+                #print("train_x_mt:\n",train_x_mt)
+                #print("train_y_mt:\n",train_y_mt)
+                
+        #custom_kernel = ScaleKernel(MaternKernel(nu=2.5))
 
         model = MultiTaskGP(
             train_x_mt,
             train_y_mt,
             task_feature=-1,
-            covar_module=custom_kernel
+            outcome_transform=Standardize(m=1), #Added Standardize outcome_transform on 1/14
+            rank=1,#Added Rank=1 on 1/14
+            #covar_module=custom_kernel,
         ).to(self.train_x.device)
         
         self.models.append(model)

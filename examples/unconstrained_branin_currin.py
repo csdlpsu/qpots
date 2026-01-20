@@ -39,7 +39,7 @@ warnings.filterwarnings('ignore')
 from qpots.acquisition import Acquisition
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
-from qpots.utils.utils import posterior_mean_fill
+from qpots.utils.utils import posterior_mean_fill, mtgp_posterior_mean_hypervolume
 from qpots.function import Function
 from botorch.utils.transforms import unnormalize
 
@@ -60,7 +60,7 @@ args = dict(
         "ncons": ncons_sent,
         "nystrom": 0,
         "nychoice": "pareto",
-        "ngen": 10,
+        "ngen": 20,
         "mt": mtgp_sent,
         "partial_info": partial_sent,
         "variance_threshold": var_thresh_sent, #.0012 : torch.tensor([.0012,.0012]) NEW:torch.tensor([.5,.5])

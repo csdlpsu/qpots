@@ -3,12 +3,15 @@ import subprocess
 import numpy as np
 import argparse
 
-"""
-call of Multi_Seed_Wrapper from the qPOTS folder:
-python -m examples.Multi_Seed_Wrapper --ntrain 20 --iters 100 --q 4 --func "branincurrin" --ref_point -18.0 -6.0 --dim 2 --nobj 2 --ncons 0 --use_mtgp --use_partial --thresh 0.5 0.5 --num_test 5 --start_seed 1023
-using BC with defaults:
-python -m examples.Multi_Seed_Wrapper --num_test 5 --start_seed 1023 --use_mtgp --use_partial --thresh 0.5 0.5
 
+"""
+call of Parallel_TC from the qPOTS folder w/ Branin-Currin:
+python -m examples.Parallel_TC --ntrain 20 --iters 20 --q 5 --func "branincurrin" --ref_point -300.0 -20.0 --dim 2 --nobj 2 --ncons 0 --use_mtgp --use_partial --thresh 1e-6 --num_test 1 --start_seed 1023
+
+using BC with defaults:
+python -m examples.Parallel_TC --num_test 5 --start_seed 1023 --use_mtgp --use_partial --thresh 1e-6
+
+Calls TC_Runner
 """
 def arg_parser():
     #default is Branin-Currin
@@ -51,22 +54,22 @@ ref_point=args.ref_point
 
 
 if func=="branincurrin":
-    file_name="Adaptable_Test_Function"
+    file_name="TC_Runner"
     test_function_tag="branincurrin"
 elif func=="zdt3":
     file_name="zdt3"
     test_function_tag="zdt3"
 elif func=="discbrake":
-    file_name="Adaptable_Test_Function"
+    file_name="TC_Runner"
     test_function_tag="discbrake"
 elif func=="DTLZ1":
-    file_name="Adaptable_Test_Function"
+    file_name="TC_Runner"
     test_function_tag="DTLZ1"
 elif func=="DTLZ2":
-    file_name="Adaptable_Test_Function"
+    file_name="TC_Runner"
     test_function_tag="DTLZ2"
 elif func=="weldedbeam":
-    file_name="Adaptable_Test_Function"
+    file_name="TC_Runner"
     test_function_tag="weldedbeam"
     
 
@@ -103,9 +106,6 @@ else:
     type_tag="Model_list"
 
 multi_variance_testing = args.multi_variance_testing
-if multi_variance_testing:
-    #variance_list=[[-1.0,-1.0],[-.75,-.75],[-.5,-.5],[-.25,-.25],[0.0,0.0],[.25,.25],[.5,.5],[.75,.75],[1.0,1.0]]
-    variance_list=[[0.1,0.1],[.2,.2],[.3,.3],[.4,.4],[0.5,0.5],[.6,.6],[.7,.7],[.8,.8],[0.90,.90]]
 
 train_y_all=[]
 train_x_all=[]
@@ -123,33 +123,19 @@ print(test_function_tag)
 print(type_tag)
 for manual_seed in range(num_tests):
     
-    if multi_variance_testing:
-        curr_var=variance_list[i]
-        i+=1
-        print(f"######################################## RUNNING Test {manual_seed+1} with variance {curr_var} ########################################")
-        subprocess.run(["python", "-m", f"examples.{file_name}", str(start_seed), str(func), str(q), str(dim), str(nobj), str(ncons), str(ntrain), str(iters), str(mtgp_sending), str(partial_sending), str(curr_var), str(ref_point)])
-    else:
-        print(f"######################################## RUNNING Test {manual_seed+1} with seed {manual_seed+start_seed} ########################################")
-        subprocess.run(["python", "-m", f"examples.{file_name}", str(manual_seed+start_seed), str(func), str(q), str(dim), str(nobj), str(ncons), str(ntrain), str(iters), str(mtgp_sending), str(partial_sending), str(thresh_sending), str(ref_point)])
-    train_y=np.load(f"../{test_function_tag}_{type_tag}_train_y.npy")
-    train_x=np.load(f"../{test_function_tag}_{type_tag}_train_x.npy")
-    hv=np.load(f"../{test_function_tag}_{type_tag}_hv.npy")
-    times=np.load(f"../{test_function_tag}_{type_tag}_times.npy")
-    pf=np.load(f"../{test_function_tag}_{type_tag}_pareto_front.npy", allow_pickle=True)
-    train_y_all.append(train_y)
-    train_x_all.append(train_x)
-    hv_all.append(hv)
-    times_all.append(times)
-    pf_all.append(pf)
-    if partial_info is True:
-        train_y_filled=np.load(f"../{test_function_tag}_{type_tag}_train_y_filled.npy")
-        #hv_full=np.load(f"../{test_function_tag}_{type_tag}_hv_full.npy")
-        iteration_tracker=np.load(f"../{test_function_tag}_{type_tag}_iteration_tracker.npy")
-        train_y_filled_all.append(train_y_filled)
-        #hv_full_all.append(hv_full)
-        iteration_tracker_all.append(iteration_tracker)
-
+    print(f"######################################## RUNNING Test {manual_seed+1} with seed {manual_seed+start_seed} ########################################")
+    subprocess.run(["python", "-m", f"examples.{file_name}", str(manual_seed+start_seed), str(func), str(q), str(dim), str(nobj), str(ncons), str(ntrain), str(iters), str(mtgp_sending), str(partial_sending), str(thresh_sending), str(ref_point)])
+    
     if num_tests>1:
+        train_y=np.load(f"../{test_function_tag}_{type_tag}_train_y.npy")
+        train_x=np.load(f"../{test_function_tag}_{type_tag}_train_x.npy")
+        hv=np.load(f"../{test_function_tag}_{type_tag}_hv.npy")
+        times=np.load(f"../{test_function_tag}_{type_tag}_times.npy")
+        #pf=np.load(f"../{test_function_tag}_{type_tag}_pareto_front.npy", allow_pickle=True)
+        train_y_all.append(train_y)
+        train_x_all.append(train_x)
+        hv_all.append(hv)
+        times_all.append(times)
         print(num_tests)
         print(test_function_tag)
         print(type_tag)
@@ -157,9 +143,9 @@ for manual_seed in range(num_tests):
         np.save(f"../{test_function_tag}_{type_tag}_train_x_all.npy", np.array(train_x_all, dtype=object))
         np.save(f"../{test_function_tag}_{type_tag}_hv_all.npy", np.array(hv_all, dtype=object))
         np.save(f"../{test_function_tag}_{type_tag}_times_all.npy", np.array(times_all, dtype=object))
-        np.save(f"../{test_function_tag}_{type_tag}_pareto_front_all.npy", np.array(pf_all, dtype=object))
-        if partial_info is True:
-            np.save(f"../{test_function_tag}_{type_tag}_train_y_filled_all.npy", np.array(train_y_filled_all, dtype=object))
+        #np.save(f"../{test_function_tag}_{type_tag}_pareto_front_all.npy", np.array(pf_all, dtype=object))
+        #if partial_info is True:
+            #np.save(f"../{test_function_tag}_{type_tag}_train_y_filled_all.npy", np.array(train_y_filled_all, dtype=object))
             #np.save(f"../{test_function_tag}_{type_tag}_hv_full_all.npy", np.array(hv_full_all, dtype=object))
-            np.save(f"../{test_function_tag}_{type_tag}_iteration_tracker_all.npy", np.array(iteration_tracker_all, dtype=object)) #changed dtype to int 9/16
+            #np.save(f"../{test_function_tag}_{type_tag}_iteration_tracker_all.npy", np.array(iteration_tracker_all, dtype=object)) #changed dtype to int 9/16
 
