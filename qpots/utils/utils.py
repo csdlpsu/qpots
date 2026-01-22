@@ -760,10 +760,13 @@ def hypervolume_from_posterior_mean_mtgp(
     # Build long-format inputs and get posterior mean for each (x, task)
     X_aug = _augment_X_with_tasks(X, num_tasks=K, task_feature=task_feature)  # (n*K, d+1)
     post = mt_model.posterior(X_aug)
+    #print("mean: ",post.mean)
     mean_flat = post.mean.squeeze(-1)  # (n*K,)
+    #print("mean_flat: ",mean_flat)
 
     n = X.shape[0]
     Y_mean = mean_flat.view(K, n).transpose(0, 1).contiguous()  # (n, K)
+    #print("Y_mean: ",Y_mean)
 
     # Hypervolume assumes maximization. If minimizing, negate both.
     if not maximize:
