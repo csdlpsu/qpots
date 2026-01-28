@@ -176,6 +176,32 @@ def qmaximin(train_X, X, *, q: int = 1, return_index: bool = False, return_dista
 
     return out[0] if len(out) == 1 else out
 
+#New function for jitter
+def cholesky_with_jitter(R, initial_jitter=1e-6, max_jitter=1e-2, factor=10.0):
+    """
+    Attempt Cholesky decomposition of R.
+    If it fails, increase diagonal jitter iteratively until success.
+    
+    Args:
+        R: (n, n) correlation/covariance matrix
+        initial_jitter: starting jitter on diagonal
+        max_jitter: maximum allowed jitter
+        factor: factor to increase jitter each attempt
+    
+    Returns:
+        L: Cholesky factor
+        final_jitter: the jitter that worked
+    """
+    jitter = initial_jitter
+    while True:
+        try:
+            L = torch.linalg.cholesky(R)
+            return L
+        except torch._C._LinAlgError:
+            print("Fail to invert, increasing jitter")
+            jitter *= factor
+            if jitter > max_jitter:
+                raise RuntimeError(f"Cholesky failed even with jitter={jitter:.3e}")
 
 def corr_and_total_correlation(
     cov: torch.Tensor,
@@ -196,6 +222,8 @@ def corr_and_total_correlation(
     """
     # Standard deviations from diagonal
     var = torch.diagonal(cov, dim1=-2, dim2=-1).clamp_min(eps)  # (..., m)
+    #print("var",var)
+    #print("cov",cov)
     std = var.sqrt()
 
     # Correlation matrix
@@ -204,12 +232,18 @@ def corr_and_total_correlation(
     # Stabilize and compute logdet via Cholesky: logdet(R) = 2 * sum(log(diag(L)))
     m = R.shape[-1]
     eye = torch.eye(m, device=R.device, dtype=R.dtype).expand(R.shape[:-2] + (m, m))
+    
     Rj = R + jitter * eye
 
-    L = torch.linalg.cholesky(Rj)
-    logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
+    print("Rj: \n",Rj)
+    try: #Runs when Rj is positive definite
+        L = torch.linalg.cholesky(Rj)
+        logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
+        TC = -0.5 * logdet
+    except RuntimeError: #If not, run coupled evaluation at this location (TC=None)
+        print("R was not invertible, performing coupled evaluation")
+        TC=None 
 
-    TC = -0.5 * logdet
     return R, TC
 
 def computeTC(x,mt_model):

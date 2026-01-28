@@ -71,8 +71,8 @@ def hypervolume_from_posterior_mean_gp(
     #print("Pulling the Posterior")
     post = model.posterior(X)
     Y_mean = post.mean
-    print("mean",post.mean)
-    print("mean shape:",post.mean.shape)
+    #print("mean",post.mean)
+    #print("mean shape:",post.mean.shape)
     #mean_flat = post.mean.squeeze(-1)  # (n*K,)
     #print("mean_flat:",mean_flat)
     #print("mean_flat shape:",mean_flat.shape)

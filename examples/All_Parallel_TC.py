@@ -15,6 +15,7 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
+print(f"[MPI CHECK] rank={rank}, size={size}",flush=True)
 
 ################### Importing settings ##########################
 import argparse
@@ -23,6 +24,7 @@ import argparse
 """
 Example call of Parallel_TC from the qPOTS folder w/ Branin-Currin and 4 Processes:
 srun python -m examples.Parallel_TC --ntrain 20 --iters 20 --q 5 --func "branincurrin" --ref_point -300.0 -20.0 --dim 2 --nobj 2 --ncons 0 --use_mtgp --use_partial --thresh 1e-6 --num_test 1 --start_seed 1023
+
 mpirun -np 1 python -m examples.Parallel_TC --ntrain 20 --iters 10 --q 5 --func "branincurrin" --ref_point -300.0 -20.0 --dim 2 --nobj 2 --ncons 0 --acq "hvkg" --num_test 1 --start_seed 1023
 
 """
@@ -53,23 +55,16 @@ def arg_parser():
     
     # Acquisition Function Options
     parser.add_argument("--acq", type=str, default="qpots", required=False, help="Which acquisition function to use.")
-    parser.add_argument("--cost", type=float, default=[3.0,1.0], required=False, help="Costs for each objective")
+    parser.add_argument("--cost", type=float, default=[3.0,1.0] , nargs="+", required=False, help="Costs for each objective")
     
     return parser.parse_args()
 
 # Saving Files
-def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,times):
-    if args["mt"]==1:
-        if args["threshold"] is None:
-            if args["partial_info"] == 1:
-                tag="rand"
-            else:
-                tag="joint"
-        else:
-            tag="thresh"
+def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,true_hvs,times,REP):
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full, dtype=object))
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_hv.npy", hvs)
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_true_hv.npy", hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_times.npy", times)
     
 
@@ -89,7 +84,7 @@ manual_seed=args.start_seed
 acquisition_function=args.acq
 cost_sent=args.cost
 if len(cost_sent) != nobj_sent:
-    print("Warning: Need same number of costs as tasks for HVKG")
+    print("Warning: Need same number of costs as tasks for HVKG",flush=True)
 
 
 mtgp_sent=args.use_mtgp
@@ -116,8 +111,8 @@ from botorch.utils.multi_objective.box_decompositions import FastNondominatedPar
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from qpots.utils.tc_utils import get_model_identified_hv_maximizing_set, qmaximin, computeTC, argmax_mi_subset_bruteforce
-from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp
-from botorch.test_functions.multi_objective import BraninCurrin
+from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true_hypervolume
+from botorch.test_functions.multi_objective import BraninCurrin, ZDT2, ZDT3, DTLZ3, DTLZ7, Penicillin, VehicleSafety, CarSideImpact
 
 
 dtype = torch.double
@@ -126,7 +121,7 @@ tkwargs = {
     "dtype": torch.double,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 }
-print("device:", device)
+print("device:", device,flush=True)
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
     {
@@ -155,6 +150,23 @@ bounds = tf.get_bounds()
 
 if func_sent=="branincurrin":
     problem = BraninCurrin(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="zdt2":
+    problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="zdt3":
+    problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz3":
+    problem = DTLZ3(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz7":
+    problem = DTLZ7(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="penicillin": 
+    problem = Penicillin(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="vehicle":
+    problem = VehicleSafety(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="carside": 
+    problem = CarSideImpact(negate=True).to(device=device, dtype=dtype)
+else:
+    raise ValueError(f"Invalid argument: --func '{func_sent}'")
+
 
 if args["ncons"] > 0:
     cons = tf.get_cons()
@@ -164,8 +176,9 @@ os.makedirs(args["wd"], exist_ok=True)
 
 #MPI
 for REP in range(REPS):
-    print("Repetition:",REP)
+ 
     if REP % size == rank:
+        print(f"Repetition {REP} on rank {rank}:",flush=True)
         # set up the training points
         torch.manual_seed(manual_seed+REP)
 
@@ -173,10 +186,15 @@ for REP in range(REPS):
         train_Y = f(unnormalize(train_X, bounds))
         train_X_full = train_X.clone()
         train_Y_full = train_Y.clone()
+
+        #Treu HV and full train_y even when decoupled for plotting
+        True_coupled_train_y = train_Y.clone()
+        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+        true_hvs=[true_hv]
         
         ### qPOTS ###
         if acquisition_function == "qpots":
-            print(f"Using {acquisition_function}")
+            print(f"Using {acquisition_function}",flush=True)
             # fit the GP models
             gps = ModelObject(train_X, train_Y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
             gps.fit_multitask_gp()
@@ -189,7 +207,6 @@ for REP in range(REPS):
                 ref_point=args["ref_point"], # length K
                 maximize=True,
             )
-
             hvs = [hv]
             times = []
             for iter in range(args["iters"]):
@@ -197,27 +214,45 @@ for REP in range(REPS):
                 res, hv = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"])
                 
                 x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
-                
+                xnew_size=x_new.shape[0]
 
-                y_new = torch.full([args["q"], args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
                 
-                tc_i = []
-                for i in range(args["q"]):
-                    tc = computeTC(x_new[i],mt_model=mt_model)
+                if partial_sent:
+                    print("Using Partial Evaluation",flush=True)
+                    tc_i = []
+                    y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+                    for i in range(xnew_size):
+                        tc = computeTC(x_new[i],mt_model=mt_model)
 
-                    tc_i.append(torch.abs(tc).item())
-                    if torch.abs(tc) > 1e-6:
-                        post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
-                        cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
-                        res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
-                        y_new[i, res["S"]]  = f(unnormalize(x_new[i], bounds))[res["S"]]
-                        
-                        # y_new[i] = torch.tensor([test_fn(x_new[i])[0], torch.math.nan]) # simply choose first objective
-                    else:
-                        y_new[i] = f(unnormalize(x_new[i], bounds))
+                        if tc is not None: #tc is None when R is invertible
+                            if torch.abs(tc) > args["threshold"]: #Perform partial eval at x when total correlation above given threshold
+                                tc_i.append(torch.abs(tc).item())
+
+                                post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
+                                cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
+                                res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
+                
+                                S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
+                                fx = f(unnormalize(x_new[i], bounds)).view(-1)
+                                y_new[i, S] = fx[S]
+                                
+                            else: #when total correlation is below threshold, perform join evaluation at x
+                                tc_i.append(torch.abs(tc).item())
+                                y_new[i] = f(unnormalize(x_new[i], bounds))
+                        else: #When R is invertible, perform joint evaluation at x
+                            y_new[i] = f(unnormalize(x_new[i], bounds))
+                else:
+                    print("Using Joint Evaluation",flush=True)
+                    y_new=f(unnormalize(x_new, bounds))
 
                 train_X_full = torch.row_stack([train_X_full, x_new])
                 train_Y_full = torch.row_stack([train_Y_full, y_new])
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=f(unnormalize(x_new, bounds))
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hvs=[true_hv]
                 
                 gps = ModelObject(train_X_full, train_Y_full, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
                 gps.fit_multitask_gp()
@@ -234,7 +269,10 @@ for REP in range(REPS):
 
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n") #iter output statement
+                if partial_sent:
+                    print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
+                else:
+                    print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
                 if args["mt"]==1:
                     if args["threshold"] is None:
                         if args["partial_info"] == 1:
@@ -245,7 +283,7 @@ for REP in range(REPS):
                         tag="thresh"
                 else:
                     tag="Model_list"
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,times=times)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP)
 
         ### HVKG ###
         elif acquisition_function == "hvkg":
@@ -254,6 +292,7 @@ for REP in range(REPS):
             from botorch.models.cost import FixedCostModel
 
             # define the cost model
+            print("HVKG:\n",flush=True)
             tag=acquisition_function
             objective_costs = {i: float(cost) for i, cost in enumerate(cost_sent)}
             objective_indices = list(objective_costs.keys())
@@ -280,14 +319,14 @@ for REP in range(REPS):
             # compute hypervolume
             #hv = get_model_identified_hv_maximizing_set(model=model_hvkg)
             hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
-            print("Initial Hypervolume is: ",hv)
+            print("Initial Hypervolume is: ",hv,flush=True)
             hvs_hvkg= [hv]
             times = []
             for iter in range(args["iters"]):
                 t1 = time.time()
 
                 # generate candidates
-                print("\nHVKG:\n")
+                print("\nHVKG:\n",flush=True)
                 (
                     new_x_hvkg,
                     new_obj_hvkg,
@@ -314,13 +353,18 @@ for REP in range(REPS):
                 fit_gpytorch_mll(mll_hvkg)
                 #hv = get_model_identified_hv_maximizing_set(model=model_hvkg)
                 hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
-
                 hvs_hvkg.append(hv)
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=f(unnormalize(new_x_hvkg, bounds))
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hvs=[true_hv]
 
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n") #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,times=times)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,true_hvs=true_hvs,times=times,REP=REP)
 
         #qNEHVI        
         elif acquisition_function == "qnehvi":
@@ -328,7 +372,7 @@ for REP in range(REPS):
             from qpots.utils.acq_utils import initialize_model,hypervolume_from_posterior_mean_gp,optimize_qnehvi_and_get_observation
             from botorch.sampling.normal import SobolQMCNormalSampler
 
-            print("qNEHVI")
+            print("qNEHVI",flush=True)
             tag=acquisition_function
             objective_costs = {i: float(cost) for i, cost in enumerate(cost_sent)}
             objective_indices = list(objective_costs.keys())
@@ -350,7 +394,7 @@ for REP in range(REPS):
             
             hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
             hvs_qnehvi= [hv]
-            print("Initial Hypervolume is: ",hv)
+            print("Initial Hypervolume is: ",hv,flush=True)
             times = []
             for iter in range(args["iters"]):
                 t1 = time.time()
@@ -375,16 +419,22 @@ for REP in range(REPS):
                 hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
 
                 hvs_qnehvi.append(hv)
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=f(unnormalize(new_x_qnehvi, bounds))
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hvs=[true_hv]
                 
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n") #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,times=times,REP=REP)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,true_hvs=true_hvs,times=times,REP=REP)
         elif acquisition_function == "sobol":
             from botorch import fit_gpytorch_mll
             from qpots.utils.acq_utils import initialize_model,hypervolume_from_posterior_mean_gp,generate_sobol_data
 
-            print("Sobol")
+            print("Sobol",flush=True)
             tag=acquisition_function
             objective_costs = {i: float(cost) for i, cost in enumerate(cost_sent)}
             objective_indices = list(objective_costs.keys())
@@ -403,7 +453,7 @@ for REP in range(REPS):
             hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
             hvs_random= [hv]
 
-            print("Initial Hypervolume is: ",hv)
+            print("Initial Hypervolume is: ",hv,flush=True)
             times = []
             for iter in range(args["iters"]):
                 t1 = time.time()
@@ -428,16 +478,23 @@ for REP in range(REPS):
                 hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
 
                 hvs_random.append(hv)
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=f(unnormalize(new_x_random, bounds))
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hvs=[true_hv]
+
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n") #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,times=times,REP=REP)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP)
         #Sobol Decoupled
         elif acquisition_function == "sobol_dec":
             from botorch import fit_gpytorch_mll
             from qpots.utils.acq_utils import initialize_model,hypervolume_from_posterior_mean_gp,generate_sobol_data
 
-            print("Sobol Decoupled")
+            print("Sobol Decoupled",flush=True)
             tag=acquisition_function
             objective_costs = {i: float(cost) for i, cost in enumerate(cost_sent)}
             objective_indices = list(objective_costs.keys())
@@ -456,7 +513,7 @@ for REP in range(REPS):
             hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
             hvs_random= [hv]
 
-            print("Initial Hypervolume is: ",hv)
+            print("Initial Hypervolume is: ",hv,flush=True)
             times = []
             for iter in range(args["iters"]):
                 t1 = time.time()
@@ -468,7 +525,7 @@ for REP in range(REPS):
                 )
                 # update training points
                 k=0
-                print("rand_tasks",rand_tasks)
+                print("rand_tasks",rand_tasks,flush=True)
                 
                 for i in rand_tasks:
                     train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random[k].unsqueeze(0)])
@@ -487,10 +544,17 @@ for REP in range(REPS):
                 hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
 
                 hvs_random.append(hv)
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=f(unnormalize(new_x_random, bounds))
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hvs=[true_hv]
+
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n") #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,times=times,REP=REP)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP)
 
 #Wait for all to finish, then merge
 comm.Barrier()  
@@ -500,20 +564,24 @@ if rank == 0:
     train_y_all=[]
     train_x_all=[]
     hv_all=[]
+    true_hv_all=[]
     times_all=[]
     
     for REP in range(REPS):
         train_y=np.load(f"../{REP}_{func_sent}_{tag}_train_y.npy", allow_pickle=True)
         train_x=np.load(f"../{REP}_{func_sent}_{tag}_train_x.npy")
         hv=np.load(f"../{REP}_{func_sent}_{tag}_hv.npy")
+        true_hv=np.load(f"../{REP}_{func_sent}_{tag}_true_hv.npy")
         times=np.load(f"../{REP}_{func_sent}_{tag}_times.npy")
         
         train_y_all.append(train_y)
         train_x_all.append(train_x)
         hv_all.append(hv)
+        true_hv_all.append(true_hv)
         times_all.append(times)
     
     np.save(f"../all_{func_sent}_{tag}_train_y.npy", np.array(train_y_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_train_x.npy", np.array(train_x_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_hv.npy", np.array(hv_all, dtype=object))
+    np.save(f"../all_{func_sent}_{tag}_true_hv.npy", np.array(hv_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_times.npy", np.array(times_all, dtype=object))

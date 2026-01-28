@@ -784,6 +784,44 @@ def hypervolume_from_posterior_mean_mtgp(
     hv = Hypervolume(ref_point=ref_point).compute(pareto_Y)
     return hv
 
+def compute_true_hypervolume(
+    Y: torch.Tensor,                      # (n, d) base features (no task column)
+    ref_point,
+    maximize,
+) -> torch.Tensor:
+    """
+    Compute true hypervolume .
+
+    Args:
+        Y: (n, d) evaluated  y values.
+        ref_point: reference point in objective space, length K (K inferred from this).
+        maximize: if False, treats objectives as minimization (internally negates).
+
+    Returns:
+        A scalar tensor: hypervolume of the non-dominated posterior-mean outcomes.
+    """
+
+    # Infer K (#objectives/tasks) from ref_point
+    if not torch.is_tensor(ref_point):
+        ref_point = torch.tensor(ref_point)
+
+    # Hypervolume assumes maximization. If minimizing, negate both.
+    if not maximize:
+        Y_mean = -Y_mean
+        ref_point = -ref_point
+
+    # Non-dominated subset of posterior means
+    nd_mask = is_non_dominated(Y_mean)
+    pareto_Y = Y_mean[nd_mask]
+
+    if pareto_Y.numel() == 0:
+        # Shouldn't happen unless n=0, but keep it safe:
+        return torch.zeros(())
+
+    hv = Hypervolume(ref_point=ref_point).compute(pareto_Y)
+    return hv
+
+
 
 
 

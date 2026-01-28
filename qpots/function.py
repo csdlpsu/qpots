@@ -82,9 +82,9 @@ class Function:
         """
         func_map = {
             "branincurrin": lambda: BraninCurrin(negate=True),
-            "dtlz1": lambda: DTLZ1(self.dim, num_objectives=self.nobj, negate=False),
+            "dtlz1": lambda: DTLZ1(self.dim, num_objectives=self.nobj, negate=True),
             "dtlz2": lambda: DTLZ2(self.dim, num_objectives=self.nobj, negate=True),
-            "dtlz3": lambda: DTLZ3(self.dim, num_objectives=self.nobj),
+            "dtlz3": lambda: DTLZ3(self.dim, num_objectives=self.nobj, negate=False),
             "dtlz7": lambda: DTLZ7(self.dim, num_objectives=self.nobj, negate=True),
             "dh1": lambda: DH1(self.dim, negate=True),
             "gmm": lambda: GMM(self.nobj, negate=True),

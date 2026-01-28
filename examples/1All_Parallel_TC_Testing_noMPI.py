@@ -47,7 +47,7 @@ def arg_parser():
     
     # Acquisition Function Options
     parser.add_argument("--acq", type=str, default="qpots", required=False, help="Which acquisition function to use.")
-    parser.add_argument("--cost", type=float, default=[3.0,1.0], required=False, help="Costs for each objective")
+    parser.add_argument("--cost", type=float, default=[3.0,1.0] , nargs="+", required=False, help="Costs for each objective")
     
     return parser.parse_args()
 
@@ -103,7 +103,7 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from qpots.utils.tc_utils import get_model_identified_hv_maximizing_set, qmaximin, computeTC, argmax_mi_subset_bruteforce
 from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp
-from botorch.test_functions.multi_objective import BraninCurrin,ZDT2,ZDT3
+from botorch.test_functions.multi_objective import BraninCurrin, ZDT2, ZDT3, DTLZ3, DTLZ7, Penicillin, VehicleSafety, CarSideImpact
 
 
 dtype = torch.double
@@ -141,10 +141,20 @@ bounds = tf.get_bounds()
 
 if func_sent=="branincurrin":
     problem = BraninCurrin(negate=True).to(device=device, dtype=dtype)
-if func_sent=="zdt2":
+elif func_sent=="zdt2":
     problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
-if func_sent=="zdt3":
+elif func_sent=="zdt3":
     problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz3":
+    problem = DTLZ3(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz7":
+    problem = DTLZ7(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="penicillin": 
+    problem = Penicillin(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="vehicle":
+    problem = VehicleSafety(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="carside": 
+    problem = CarSideImpact(negate=True).to(device=device, dtype=dtype)
 
 if args["ncons"] > 0:
     cons = tf.get_cons()
@@ -186,12 +196,13 @@ for REP in range(REPS):
             res, hv = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"])
             
             x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
-            
+            print(x_new.shape[0])
+            xnew_size=x_new.shape[0]
 
-            y_new = torch.full([args["q"], args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+            y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
             
             tc_i = []
-            for i in range(args["q"]):
+            for i in range(xnew_size):
                 tc = computeTC(x_new[i],mt_model=mt_model)
 
                 tc_i.append(torch.abs(tc).item())
@@ -199,8 +210,10 @@ for REP in range(REPS):
                     post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
                     cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
                     res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
-                    y_new[i, res["S"]]  = f(unnormalize(x_new[i], bounds))[res["S"]]
-                    
+                    #y_new[i, res["S"]]  = f(unnormalize(x_new[i], bounds))[res["S"]]
+                    S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
+                    fx = f(unnormalize(x_new[i], bounds)).view(-1)
+                    y_new[i, S] = fx[S]
                     # y_new[i] = torch.tensor([test_fn(x_new[i])[0], torch.math.nan]) # simply choose first objective
                 else:
                     y_new[i] = f(unnormalize(x_new[i], bounds))
