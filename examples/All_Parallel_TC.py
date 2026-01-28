@@ -60,11 +60,12 @@ def arg_parser():
     return parser.parse_args()
 
 # Saving Files
-def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,true_hvs,times,REP):
+def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,true_hvs,times,REP,coupled_y):
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full, dtype=object))
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y, dtype=object))
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_hv.npy", hvs)
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_true_hv.npy", hvs)
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_true_hv.npy", true_hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_times.npy", times)
     
 
@@ -252,7 +253,7 @@ for REP in range(REPS):
                 coupled_new_y=f(unnormalize(x_new, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
-                true_hvs=[true_hv]
+                true_hvs.append(true_hv)
                 
                 gps = ModelObject(train_X_full, train_Y_full, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
                 gps.fit_multitask_gp()
@@ -283,7 +284,7 @@ for REP in range(REPS):
                         tag="thresh"
                 else:
                     tag="Model_list"
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
         ### HVKG ###
         elif acquisition_function == "hvkg":
@@ -359,12 +360,12 @@ for REP in range(REPS):
                 coupled_new_y=f(unnormalize(new_x_hvkg, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
-                true_hvs=[true_hv]
+                true_hvs.append(true_hv)
 
                 t2 = time.time()
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,true_hvs=true_hvs,times=times,REP=REP)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
         #qNEHVI        
         elif acquisition_function == "qnehvi":
@@ -424,12 +425,12 @@ for REP in range(REPS):
                 coupled_new_y=f(unnormalize(new_x_qnehvi, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
-                true_hvs=[true_hv]
+                true_hvs.append(true_hv)
                 
                 t2 = time.time()
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,true_hvs=true_hvs,times=times,REP=REP)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
         elif acquisition_function == "sobol":
             from botorch import fit_gpytorch_mll
             from qpots.utils.acq_utils import initialize_model,hypervolume_from_posterior_mean_gp,generate_sobol_data
@@ -483,12 +484,12 @@ for REP in range(REPS):
                 coupled_new_y=f(unnormalize(new_x_random, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
-                true_hvs=[true_hv]
+                true_hvs.append(true_hv)
 
                 t2 = time.time()
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
         #Sobol Decoupled
         elif acquisition_function == "sobol_dec":
             from botorch import fit_gpytorch_mll
@@ -549,12 +550,12 @@ for REP in range(REPS):
                 coupled_new_y=f(unnormalize(new_x_random, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
-                true_hvs=[true_hv]
+                true_hvs.append(true_hv)
 
                 t2 = time.time()
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
-                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP)
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
 #Wait for all to finish, then merge
 comm.Barrier()  
@@ -562,6 +563,7 @@ comm.Barrier()
 #Merging all into master file
 if rank == 0:
     train_y_all=[]
+    coupled_y_all=[]
     train_x_all=[]
     hv_all=[]
     true_hv_all=[]
@@ -569,11 +571,13 @@ if rank == 0:
     
     for REP in range(REPS):
         train_y=np.load(f"../{REP}_{func_sent}_{tag}_train_y.npy", allow_pickle=True)
+        coupled_y=np.load(f"../{REP}_{func_sent}_{tag}_coupled_y.npy", allow_pickle=True)
         train_x=np.load(f"../{REP}_{func_sent}_{tag}_train_x.npy")
         hv=np.load(f"../{REP}_{func_sent}_{tag}_hv.npy")
         true_hv=np.load(f"../{REP}_{func_sent}_{tag}_true_hv.npy")
         times=np.load(f"../{REP}_{func_sent}_{tag}_times.npy")
         
+        coupled_y_all.append(coupled_y)
         train_y_all.append(train_y)
         train_x_all.append(train_x)
         hv_all.append(hv)
@@ -581,7 +585,8 @@ if rank == 0:
         times_all.append(times)
     
     np.save(f"../all_{func_sent}_{tag}_train_y.npy", np.array(train_y_all, dtype=object))
+    np.save(f"../all_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_train_x.npy", np.array(train_x_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_hv.npy", np.array(hv_all, dtype=object))
-    np.save(f"../all_{func_sent}_{tag}_true_hv.npy", np.array(hv_all, dtype=object))
+    np.save(f"../all_{func_sent}_{tag}_true_hv.npy", np.array(true_hv_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_times.npy", np.array(times_all, dtype=object))
