@@ -210,9 +210,20 @@ for REP in range(REPS):
             )
             hvs = [hv]
             times = []
+            max_NSGA_iters=10
             for iter in range(args["iters"]):
                 t1 = time.time() # tracking time
-                res, hv = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"])
+                
+                for multiplier in range(max_NSGA_iters):
+                    print("using Multiplier: ",multiplier+1,flush=True)
+                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1)
+                    print("res.X.shape[0]:", res.X.shape[0],flush=True)
+                    if res.X.shape[0] >= args["q"]:
+                        break
+                else:
+                    raise RuntimeError("Could not get q candidates after max_tries")
+                
+
                 
                 x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
                 xnew_size=x_new.shape[0]

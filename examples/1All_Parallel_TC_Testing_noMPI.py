@@ -130,7 +130,7 @@ args = dict(
         "ngen": 20,
         "mt": mtgp_sent,
         "partial_info": partial_sent,
-        "threshold": thresh_sent, 
+        "threshold": torch.tensor(thresh_sent), 
     }
 )
 
@@ -191,9 +191,18 @@ for REP in range(REPS):
 
         hvs = [hv]
         times = []
+        max_NSGA_iters=10
         for iter in range(args["iters"]):
             t1 = time.time() # tracking time
-            res, hv = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"])
+            print("\nIter ",iter)
+            for multiplier in range(max_NSGA_iters):
+                print("using Multiplier: ",multiplier+1,flush=True)
+                res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1)
+                print("res.X.shape[0]:", res.X.shape[0],flush=True)
+                if res.X.shape[0] >= args["q"]:
+                    break
+            else:
+                raise RuntimeError("Could not get q candidates after max_tries")
             
             x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
             print(x_new.shape[0])
@@ -201,22 +210,34 @@ for REP in range(REPS):
 
             y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
             
-            tc_i = []
-            for i in range(xnew_size):
-                tc = computeTC(x_new[i],mt_model=mt_model)
+            if partial_sent:
+                print("Using Partial Evaluation",flush=True)
+                tc_i = []
+                y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+                for i in range(xnew_size):
+                    tc = computeTC(x_new[i],mt_model=mt_model)
 
-                tc_i.append(torch.abs(tc).item())
-                if torch.abs(tc) > 1e-6:
-                    post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
-                    cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
-                    res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
-                    #y_new[i, res["S"]]  = f(unnormalize(x_new[i], bounds))[res["S"]]
-                    S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
-                    fx = f(unnormalize(x_new[i], bounds)).view(-1)
-                    y_new[i, S] = fx[S]
-                    # y_new[i] = torch.tensor([test_fn(x_new[i])[0], torch.math.nan]) # simply choose first objective
-                else:
-                    y_new[i] = f(unnormalize(x_new[i], bounds))
+                    if tc is not None: #tc is None when R is invertible
+                        if torch.abs(tc) > args["threshold"]: #Perform partial eval at x when total correlation above given threshold
+                            tc_i.append(torch.abs(tc).item())
+
+                            post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
+                            cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
+                            res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
+            
+                            S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
+                            fx = f(unnormalize(x_new[i], bounds)).view(-1)
+                            y_new[i, S] = fx[S]
+                            
+                        else: #when total correlation is below threshold, perform join evaluation at x
+                            tc_i.append(torch.abs(tc).item())
+                            y_new[i] = f(unnormalize(x_new[i], bounds))
+                    else: #When R is invertible, perform joint evaluation at x
+                        y_new[i] = f(unnormalize(x_new[i], bounds))
+            else:
+                print("Using Joint Evaluation",flush=True)
+                y_new=f(unnormalize(x_new, bounds))
+
 
             train_X_full = torch.row_stack([train_X_full, x_new])
             train_Y_full = torch.row_stack([train_Y_full, y_new])

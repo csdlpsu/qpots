@@ -34,7 +34,7 @@ def get_model_identified_hv_maximizing_set(
     model,
     problem,
     ref_point,
-    population_size=250,
+    multiplier=1,
     max_gen=100,
     
 ):
@@ -44,6 +44,8 @@ def get_model_identified_hv_maximizing_set(
         "device": ref_point.device,
     }
     dim = problem.dim
+    population_size=100*dim*multiplier
+    #print("population size:", population_size,flush=True)
 
     class PosteriorMeanPymooProblem(Problem):
         def __init__(self):
@@ -71,7 +73,7 @@ def get_model_identified_hv_maximizing_set(
         pymoo_problem,
         algorithm,
         # termination=MaximumGenerationTermination(max_gen),
-        pop_size=200,
+        pop_size=population_size,
         seed=2430,
         verbose=False,
     )
@@ -235,7 +237,7 @@ def corr_and_total_correlation(
     
     Rj = R + jitter * eye
 
-    print("Rj: \n",Rj)
+    #print("Rj: \n",Rj)
     try: #Runs when Rj is positive definite
         L = torch.linalg.cholesky(Rj)
         logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
