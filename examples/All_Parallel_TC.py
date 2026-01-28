@@ -189,7 +189,7 @@ for REP in range(REPS):
 
         #Treu HV and full train_y even when decoupled for plotting
         True_coupled_train_y = train_Y.clone()
-        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
         true_hvs=[true_hv]
         
         ### qPOTS ###
@@ -251,7 +251,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(x_new, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs=[true_hv]
                 
                 gps = ModelObject(train_X_full, train_Y_full, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
@@ -358,7 +358,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(new_x_hvkg, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs=[true_hv]
 
                 t2 = time.time()
@@ -423,7 +423,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(new_x_qnehvi, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs=[true_hv]
                 
                 t2 = time.time()
@@ -482,7 +482,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(new_x_random, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs=[true_hv]
 
                 t2 = time.time()
@@ -548,7 +548,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(new_x_random, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs=[true_hv]
 
                 t2 = time.time()
