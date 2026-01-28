@@ -807,12 +807,12 @@ def compute_true_hypervolume(
 
     # Hypervolume assumes maximization. If minimizing, negate both.
     if not maximize:
-        Y_mean = -Y_mean
+        Y = -Y
         ref_point = -ref_point
 
     # Non-dominated subset of posterior means
-    nd_mask = is_non_dominated(Y_mean)
-    pareto_Y = Y_mean[nd_mask]
+    nd_mask = is_non_dominated(Y)
+    pareto_Y = Y[nd_mask]
 
     if pareto_Y.numel() == 0:
         # Shouldn't happen unless n=0, but keep it safe:

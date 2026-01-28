@@ -139,7 +139,7 @@ args = dict(
         "ngen": 20,
         "mt": mtgp_sent,
         "partial_info": partial_sent,
-        "threshold": thresh_sent, 
+        "threshold": torch.tensor(thresh_sent), 
     }
 )
 
