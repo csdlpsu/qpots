@@ -36,6 +36,7 @@ def get_model_identified_hv_maximizing_set(
     ref_point,
     multiplier=1,
     max_gen=100,
+    ncons=0
     
 ):
     """Optimize the posterior mean using NSGA-II."""
@@ -45,6 +46,7 @@ def get_model_identified_hv_maximizing_set(
     }
     dim = problem.dim
     population_size=100*dim*multiplier
+    seed=2429+multiplier
     #print("population size:", population_size,flush=True)
 
     class PosteriorMeanPymooProblem(Problem):
@@ -60,7 +62,18 @@ def get_model_identified_hv_maximizing_set(
         def _evaluate(self, x, out, *args, **kwargs):
             #torch.manual_seed(2439) #Setting same seed to see if its the same now? for sampling for posterior optimization
             X = torch.from_numpy(x).to(**tkwargs)
-            y = model.posterior(X).sample().reshape(-1,problem.nobj)
+            y = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
+            #print("y posterior sample full shape in pymoo:",y.shape)
+
+            #Constraint Handling
+            if ncons > 0:
+                ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
+                #print("y[..., -ncons :] : \n",y[..., -ncons :])
+                #print("ind_feasible: \n",ind_feasible)
+                y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
+                y = y[..., : problem.nobj]
+                #print("y after cons filtering shape in pymoo:",y.shape)
+
             #print("evaluate post sample:\n",y)                    
             out["F"] = -y.cpu().numpy()
 
@@ -74,7 +87,7 @@ def get_model_identified_hv_maximizing_set(
         algorithm,
         # termination=MaximumGenerationTermination(max_gen),
         pop_size=population_size,
-        seed=2430,
+        seed=seed,
         verbose=False,
     )
     X = torch.tensor(

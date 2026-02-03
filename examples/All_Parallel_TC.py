@@ -140,7 +140,7 @@ args = dict(
         "ngen": 20,
         "mt": mtgp_sent,
         "partial_info": partial_sent,
-        "threshold": torch.tensor(thresh_sent), 
+        "threshold": thresh_sent, 
     }
 )
 
@@ -211,6 +211,8 @@ for REP in range(REPS):
             hvs = [hv]
             times = []
             max_NSGA_iters=10
+            NSGA_expansion_counter=0
+            Non_invertible_counter=0
             for iter in range(args["iters"]):
                 t1 = time.time() # tracking time
                 
@@ -218,6 +220,9 @@ for REP in range(REPS):
                     print("using Multiplier: ",multiplier+1,flush=True)
                     res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1)
                     print("res.X.shape[0]:", res.X.shape[0],flush=True)
+                    if multiplier>1:
+                        NSGA_expansion_counter+=1
+
                     if res.X.shape[0] >= args["q"]:
                         break
                 else:
@@ -237,7 +242,7 @@ for REP in range(REPS):
                         tc = computeTC(x_new[i],mt_model=mt_model)
 
                         if tc is not None: #tc is None when R is invertible
-                            if torch.abs(tc) > args["threshold"]: #Perform partial eval at x when total correlation above given threshold
+                            if torch.abs(tc) > torch.tensor(args["threshold"]): #Perform partial eval at x when total correlation above given threshold
                                 tc_i.append(torch.abs(tc).item())
 
                                 post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
@@ -253,6 +258,7 @@ for REP in range(REPS):
                                 y_new[i] = f(unnormalize(x_new[i], bounds))
                         else: #When R is invertible, perform joint evaluation at x
                             y_new[i] = f(unnormalize(x_new[i], bounds))
+                            Non_invertible_counter+=1
                 else:
                     print("Using Joint Evaluation",flush=True)
                     y_new=f(unnormalize(x_new, bounds))
@@ -296,6 +302,8 @@ for REP in range(REPS):
                 else:
                     tag="Model_list"
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
+                np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_exception_handling_NSGA.npy", NSGA_expansion_counter)
+                np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_Non_invertible_counter.npy", Non_invertible_counter)
 
         ### HVKG ###
         elif acquisition_function == "hvkg":
@@ -368,7 +376,7 @@ for REP in range(REPS):
                 hvs_hvkg.append(hv)
 
                 #Update true HV using true coupled train_y
-                coupled_new_y=f(unnormalize(new_x_hvkg, bounds))
+                coupled_new_y=f(new_x_hvkg)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs.append(true_hv)
@@ -433,7 +441,7 @@ for REP in range(REPS):
                 hvs_qnehvi.append(hv)
 
                 #Update true HV using true coupled train_y
-                coupled_new_y=f(unnormalize(new_x_qnehvi, bounds))
+                coupled_new_y=f(new_x_qnehvi)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs.append(true_hv)
@@ -492,7 +500,7 @@ for REP in range(REPS):
                 hvs_random.append(hv)
 
                 #Update true HV using true coupled train_y
-                coupled_new_y=f(unnormalize(new_x_random, bounds))
+                coupled_new_y=f(new_x_random)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs.append(true_hv)
@@ -558,7 +566,7 @@ for REP in range(REPS):
                 hvs_random.append(hv)
 
                 #Update true HV using true coupled train_y
-                coupled_new_y=f(unnormalize(new_x_random, bounds))
+                coupled_new_y=f(new_x_random)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
                 true_hvs.append(true_hv)
@@ -579,6 +587,8 @@ if rank == 0:
     hv_all=[]
     true_hv_all=[]
     times_all=[]
+    NSGA_all=[]
+    NonInv_all=[]
     
     for REP in range(REPS):
         train_y=np.load(f"../{REP}_{func_sent}_{tag}_train_y.npy", allow_pickle=True)
@@ -588,12 +598,20 @@ if rank == 0:
         true_hv=np.load(f"../{REP}_{func_sent}_{tag}_true_hv.npy")
         times=np.load(f"../{REP}_{func_sent}_{tag}_times.npy")
         
+        if acquisition_function == "qpots":
+            NSGA_iter=np.load(f"../{REP}_{func_sent}_{tag}_exception_handling_NSGA.npy")
+            NonInv_iter=np.load(f"../{REP}_{func_sent}_{tag}_Non_invertible_counter.npy")
+            NSGA_all.append(NSGA_iter)
+            NonInv_all.append(NonInv_iter)
+        
+        
         coupled_y_all.append(coupled_y)
         train_y_all.append(train_y)
         train_x_all.append(train_x)
         hv_all.append(hv)
         true_hv_all.append(true_hv)
         times_all.append(times)
+
     
     np.save(f"../all_{func_sent}_{tag}_train_y.npy", np.array(train_y_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y_all, dtype=object))
@@ -601,3 +619,7 @@ if rank == 0:
     np.save(f"../all_{func_sent}_{tag}_hv.npy", np.array(hv_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_true_hv.npy", np.array(true_hv_all, dtype=object))
     np.save(f"../all_{func_sent}_{tag}_times.npy", np.array(times_all, dtype=object))
+
+    if acquisition_function == "qpots":
+        np.save(f"../all_{func_sent}_{tag}_exception_handling_NSGA.npy", np.array(NSGA_all, dtype=object))
+        np.save(f"../all_{func_sent}_{tag}_Non_invertible_counter.npy", np.array(NonInv_all, dtype=object))

@@ -241,21 +241,6 @@ class Acquisition:
         model=gps.models[0]
         #Do not need appending of task IDS for posterior sampling:
         Ys_=model.posterior(normalize(x,gps.bounds)).sample() #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
-
-        #Old method, adapted from singletask
-        """
-        for task in range(self.nobj+self.ncons):
-            task_ids=task*torch.ones(x.shape[0],1)
-            x_norm=normalize(x,gps.bounds)
-            x_mt=torch.cat([x_norm,task_ids],dim=-1)
-          
-            sample=model.posterior(x_mt).sample().squeeze(0)
-            
-            Ys_.append(sample)
-
-
-        Ys_ = unstandardize_ignore_nan(torch.cat(Ys_, -1), gps.train_y.to(self.device))
-        """
         Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
         
         if self.ncons > 0:

@@ -16,16 +16,19 @@ from botorch.acquisition.multi_objective.hypervolume_knowledge_gradient import (
     _get_hv_value_function,
     qHypervolumeKnowledgeGradient,
 )
+from botorch.acquisition.objective import ConstrainedMCObjective
+
 from botorch.optim.optimize import optimize_acqf
 
 from botorch.acquisition.multi_objective.logei import qLogNoisyExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.objective import IdentityMCMultiOutputObjective, FeasibilityWeightedMCMultiOutputObjective 
 
 #initializing model
-def initialize_model(train_x_list, train_obj_list,bounds):
+def initialize_model(train_x_list, train_obj_list, bounds):
     # define models for objective and constraint
     train_x_list = [normalize(train_x, bounds) for train_x in train_x_list]
     models = []
-    for i in range(len(train_obj_list)):
+    for i in range(len(train_obj_list)): #assumes constraints are already put into train_obj_list
         train_y = train_obj_list[i]
         train_yvar = torch.full_like(train_y, 1e-7)  # noiseless
         models.append(
@@ -33,14 +36,7 @@ def initialize_model(train_x_list, train_obj_list,bounds):
                 train_X=train_x_list[i],
                 train_Y=train_y,
                 train_Yvar=train_yvar,
-                covar_module=ScaleKernel(
-                    MaternKernel(
-                        nu=2.5,
-                        ard_num_dims=train_x_list[0].shape[-1],
-                        lengthscale_prior=GammaPrior(2.0, 2.0),
-                    ),
-                    outputscale_prior=GammaPrior(2.0, 0.15),
-                )
+                #covar_module=ScaleKernel(MaternKernel(nu=2.5,ard_num_dims=train_x_list[0].shape[-1],lengthscale_prior=GammaPrior(2.0, 2.0),),outputscale_prior=GammaPrior(2.0, 0.15), )
             )
         )
     model = ModelListGP(*models)
@@ -50,6 +46,7 @@ def initialize_model(train_x_list, train_obj_list,bounds):
 def hypervolume_from_posterior_mean_gp(
     model,
     X: torch.Tensor,                      # (n, d) base features (no task column)
+    ncons,
     *,
     ref_point,
     maximize,
@@ -71,16 +68,12 @@ def hypervolume_from_posterior_mean_gp(
     #print("Pulling the Posterior")
     post = model.posterior(X)
     Y_mean = post.mean
-    #print("mean",post.mean)
-    #print("mean shape:",post.mean.shape)
-    #mean_flat = post.mean.squeeze(-1)  # (n*K,)
-    #print("mean_flat:",mean_flat)
-    #print("mean_flat shape:",mean_flat.shape)
+    if ncons>0:
+        ind_feasible = (Y_mean[..., -ncons :] >= 0).all(dim=-1)
+        Y_mean[~ind_feasible.squeeze(), -ncons :] = -1e12  # Penalize infeasible points
+        Y_mean = Y_mean[...,:-ncons]
 
-    #n = X.shape[0]
-    ##Y_mean = mean_flat.view(K, n).transpose(0, 1).contiguous()  # (n, K)
-    #print("Y_mean:",Y_mean)
-    #print("Y_mean shape:",Y_mean.shape)
+    
     
     # Hypervolume assumes maximization. If minimizing, negate both.
     if not maximize:
@@ -103,6 +96,7 @@ def get_current_value(
     model,
     ref_point,
     bounds,
+    mcobjective=None
 ):
     """Helper to get the hypervolume of the current hypervolume
     maximizing set.
@@ -111,7 +105,9 @@ def get_current_value(
         model=model,
         ref_point=ref_point,
         use_posterior_mean=True,
+        objective=mcobjective
     )
+    
     _, current_value = optimize_acqf(
         acq_function=curr_val_acqf,
         bounds=bounds,
@@ -123,36 +119,59 @@ def get_current_value(
     )
     return current_value
 #optimize Hypervolume Knowledge Gradient decoupled
-def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_bounds,objective_indices):
+def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_bounds,objective_indices,nobj,ncons,train_x):
     """Utility to initialize and optimize HVKG."""
     cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
 
-    current_value = get_current_value(
-        model=model,
-        ref_point=problem.ref_point,
-        bounds=standard_bounds,
-    )
+    if ncons > 0:
+        #Setting Constrained MC Objective
+        identity_objective=IdentityMCMultiOutputObjective(outcomes=list(range(nobj)))
+        mc_objective=FeasibilityWeightedMCMultiOutputObjective(model=model,X_baseline= train_x,constraint_idcs=list(range(-ncons, 0)), objective=identity_objective)
 
-    acq_func = qHypervolumeKnowledgeGradient(
-        model=model,
-        ref_point=problem.ref_point,  # use known reference point from the problem for stability
-        num_fantasies=8, #From their implementation
-        num_pareto=10, #From their implementation
-        current_value=current_value,
-        cost_aware_utility=cost_aware_utility,
-    )
+        current_value = get_current_value(
+            model=model,
+            ref_point=problem.ref_point,
+            bounds=standard_bounds,
+            mcobjective=mc_objective
+        )
+
+        acq_func = qHypervolumeKnowledgeGradient(
+            model=model,
+            ref_point=problem.ref_point,  # use known reference point from the problem for stability
+            num_fantasies=8, #From their implementation
+            num_pareto=10, #From their implementation
+            objective=mc_objective,
+            #constraints=[lambda Z, i=i: -Z[..., i] for i in range(-ncons, 0)], # qNEHVI expects negative constraints to be feasible, but we consider positive constraints to be feasible, so negating the constraint lambda functions 
+            current_value=current_value,
+            cost_aware_utility=cost_aware_utility,
+        )
+
+    else:
+        current_value = get_current_value(
+            model=model,
+            ref_point=problem.ref_point,
+            bounds=standard_bounds,
+        )
+        acq_func = qHypervolumeKnowledgeGradient(
+            model=model,
+            ref_point=problem.ref_point,  # use known reference point from the problem for stability
+            num_fantasies=8, #From their implementation
+            num_pareto=10, #From their implementation
+            current_value=current_value,
+            cost_aware_utility=cost_aware_utility,
+        )
 
     # optimize acquisition functions and get new observations
     objective_vals = []
     objective_candidates = []
     #print("objective_indices",objective_indices)
-    for objective_idx in objective_indices: #Generates an x location and a value for each objective
+    for objective_idx in range(nobj+ncons): #Generates an x location and a value for each objective
         # set evaluation index to only condition on one objective
         # this could be multiple objectives
         print("Objective ",objective_idx)
         X_evaluation_mask = torch.zeros(
             q,
-            len(objective_indices),
+            nobj+ncons,
             dtype=torch.bool,
             device=standard_bounds.device,
         )
@@ -180,20 +199,42 @@ def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_boun
     # observe new values
     new_x = unnormalize(candidates.detach(), bounds=problem.bounds)
     new_obj = problem(new_x)
+    #print("new_obj in HVKG",new_obj)
+    #print("new_obj in HVKG shape",new_obj.shape)
+    if ncons>0:
+        new_con = problem._evaluate_slack_true(new_x)
+        #print(new_con)
+        #print(new_con.shape)
+        new_obj = torch.column_stack([new_obj,new_con])
+        #print("new_obj w/ cons in HVKG",new_obj)
     new_obj = new_obj[..., eval_objective_indices]
     return new_x, new_obj, eval_objective_indices
 
 # qNEHVI
-def optimize_qnehvi_and_get_observation(model, train_x, sampler, q, problem,standard_bounds):
+def optimize_qnehvi_and_get_observation(model, train_x, sampler, q, problem,standard_bounds,ncons,nobj ):
     """Optimizes the qNEHVI acquisition function, and returns a new candidate and observation."""
     # partition non-dominated space into disjoint rectangles
-    acq_func = qLogNoisyExpectedHypervolumeImprovement(
-        model=model,
-        ref_point=problem.ref_point.tolist(),  # use known reference point
-        X_baseline=normalize(train_x, problem.bounds),
-        prune_baseline=True,  # prune baseline points that have estimated zero probability of being Pareto optimal
-        sampler=sampler,
-    )
+    
+    if ncons>0:
+        #print(f"ncons: {ncons}")
+        acq_func = qLogNoisyExpectedHypervolumeImprovement(
+            model=model,
+            ref_point=problem.ref_point.tolist(),  # use known reference point
+            X_baseline=normalize(train_x, problem.bounds),
+            prune_baseline=True,  # prune baseline points that have estimated zero probability of being Pareto optimal
+            sampler=sampler,
+            objective=IdentityMCMultiOutputObjective(outcomes=list(range(nobj))),
+            constraints=[lambda Z, i=i: -Z[..., i] for i in range(-ncons, 0)], # qNEHVI expects negative constraints to be feasible, but we consider positive constraints to be feasible, so negating the constraint lambda functions
+        )
+    else:
+        acq_func = qLogNoisyExpectedHypervolumeImprovement(
+            model=model,
+            ref_point=problem.ref_point.tolist(),  # use known reference point
+            X_baseline=normalize(train_x, problem.bounds),
+            prune_baseline=True,  # prune baseline points that have estimated zero probability of being Pareto optimal
+            sampler=sampler,
+        )
+
     # optimize
     candidates, _ = optimize_acqf(
         acq_function=acq_func,

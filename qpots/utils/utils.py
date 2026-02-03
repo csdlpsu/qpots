@@ -787,6 +787,8 @@ def hypervolume_from_posterior_mean_mtgp(
 def compute_true_hypervolume(
     Y: torch.Tensor,                      # (n, d) base features (no task column)
     ref_point,
+    nobj,
+    ncons,
     maximize,
 ) -> torch.Tensor:
     """
@@ -800,6 +802,18 @@ def compute_true_hypervolume(
     Returns:
         A scalar tensor: hypervolume of the non-dominated posterior-mean outcomes.
     """
+    #####NEW 1/30
+    
+    #Checking Constraint Feasibility
+    if ncons > 0:
+        is_feas = (Y[..., -ncons:] >= 0).all(dim=-1)
+        Y = Y[is_feas]
+        #print("is_feas",is_feas)
+        #print("Y feas",Y)
+
+    #Taking only the objective
+    Y=Y[...,:nobj]
+    #print("Y feas obj",Y)
 
     # Infer K (#objectives/tasks) from ref_point
     if not torch.is_tensor(ref_point):

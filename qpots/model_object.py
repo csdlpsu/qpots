@@ -144,11 +144,7 @@ class ModelObject:
         
         task_ids_init = torch.arange(self.nobj+self.ncons).expand(self.ntrain,self.nobj+self.ncons).reshape(-1,1)
         train_x_mt = torch.cat([x_init,task_ids_init],dim=-1)
-        """
-        if num_inputs <= self.ntrain:
-            print("train_x_mt:\n",train_x_mt)
-            print("train_y_mt:\n",train_y_mt)
-        """
+    
         
         #Additional training data:
         if num_inputs > self.ntrain:
