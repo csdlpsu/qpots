@@ -811,7 +811,7 @@ def compute_true_hypervolume(
         #print("is_feas",is_feas)
         #print("Y feas",Y)
 
-    #Taking only the objective
+    #Taking only the objectives
     Y=Y[...,:nobj]
     #print("Y feas obj",Y)
 

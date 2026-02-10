@@ -6,6 +6,7 @@ from botorch.fit import fit_gpytorch_mll
 from botorch.utils.transforms import standardize
 from gpytorch.kernels import ScaleKernel, MaternKernel
 from botorch.models.transforms.outcome import Standardize
+from botorch.exceptions.errors import ModelFittingError
 
 
 class ModelObject:
@@ -61,6 +62,7 @@ class ModelObject:
         self.device = device
         self.models = []
         self.mlls = []
+        self.prev_state_dict = None
         
         
 
@@ -179,7 +181,15 @@ class ModelObject:
         self.models.append(model)
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         self.mlls.append(mll)
-        fit_gpytorch_mll(mll)
+        
+        try:
+            fit_gpytorch_mll(mll)
+            self.prev_state_dict = model.state_dict()
+        except ModelFittingError:
+            print("WARNING: GP fitting failed. Restoring previous hyperparameters.")
+            model.load_state_dict(self.prev_state_dict)
+            
+
 
     def fit_gp_no_variance(self, single_objective=False):
         """

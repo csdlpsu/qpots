@@ -79,6 +79,10 @@ acquisition_function=args.acq
 cost_sent=args.cost
 if len(cost_sent) != nobj_sent+ncons_sent:
     print("Warning: Need same number of costs as tasks (objectives + constraints) for HVKG",flush=True)
+    if acquisition_function=="hvkg":
+        raise IndexError(
+            f"Need --cost to have {nobj_sent+ncons_sent} inputs"
+        )
 
 
 mtgp_sent=args.use_mtgp
@@ -106,8 +110,11 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from qpots.utils.tc_utils import get_model_identified_hv_maximizing_set, qmaximin, computeTC, argmax_mi_subset_bruteforce
 from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true_hypervolume
-from botorch.test_functions.multi_objective import BraninCurrin, ZDT2, ZDT3, DTLZ3, DTLZ7, Penicillin, VehicleSafety, CarSideImpact, ConstrainedBraninCurrin
-
+from botorch.test_functions.multi_objective import (
+    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
+    VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+)
 
 dtype = torch.double
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -160,13 +167,15 @@ elif func_sent=="carside":
     problem = CarSideImpact(negate=True).to(device=device, dtype=dtype)
 elif func_sent=="constrainedbc":
     problem = ConstrainedBraninCurrin(negate=True).to(device=device, dtype=dtype)
+elif func_sent=='discbrake':
+    problem = DiscBrake(negate=True).to(device=device, dtype=dtype)
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
 
 os.makedirs(args["wd"], exist_ok=True)
 
-#MPI
+#No MPI
 for REP in range(REPS):
  
     # set up the training points
@@ -213,7 +222,7 @@ for REP in range(REPS):
             t1 = time.time() # tracking time
             
             for multiplier in range(max_NSGA_iters):
-                print("using Multiplier: ",multiplier+1,flush=True)
+                print("using Multiplier: ", multiplier+1,flush=True)
                 res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1,ncons=args["ncons"])
                 print("res.X.shape[0]:", res.X.shape[0],flush=True)
                 if multiplier>1:
@@ -265,10 +274,7 @@ for REP in range(REPS):
                             fx=f(unnormalize(x_new[i], bounds)).unsqueeze(0)
                             if args["ncons"] > 0:
                                 fc=cons(unnormalize(x_new[i], bounds)).unsqueeze(0) #Constraints at x_i
-                                #print("fx.shape",fx.shape)
-                                #print("fc.shape",fc.shape)
-                                #print("fx",fx)
-                                #print("fc",fc)
+                               
                                 fx=torch.column_stack((fx,fc))#Combining into objectives+cons
                             y_new[i] = fx
                     else: #When R isnt invertible, perform joint evaluation at x
@@ -284,12 +290,9 @@ for REP in range(REPS):
                 fx=f(unnormalize(x_new, bounds))
                 if args["ncons"] > 0:
                     fc=cons(unnormalize(x_new, bounds)) #Constraints at x_i
-                    #print("fx.shape: ",fx.shape)
-                    #print("fc.shape: ",fc.shape)
-                    #print("fx: \n",fx)
-                    #print("fc: \n",fc)
+            
                     fx=torch.column_stack((fx,fc))#Combining into objectives+cons
-                    #print("fx: \n",fx)
+                    
                 y_new = fx
 
             train_X_full = torch.row_stack([train_X_full, x_new])
@@ -324,9 +327,9 @@ for REP in range(REPS):
             t2 = time.time()
             times.append(t2 - t1)
             if partial_sent:
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
             else:
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
             if args["mt"]==1:
                 if args["threshold"] is None:
                     if args["partial_info"] == 1:
@@ -375,7 +378,7 @@ for REP in range(REPS):
         # compute hypervolume
         #hv = get_model_identified_hv_maximizing_set(model=model_hvkg)
         hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ncons=args["ncons"],ref_point=args["ref_point"],maximize=True,)
-        print("Initial Hypervolume is: ",hv,flush=True)
+        print("Initial Hypervolume is: ",true_hv,flush=True)
         hvs_hvkg= [hv]
         times = []
         for iter in range(args["iters"]):
@@ -391,20 +394,8 @@ for REP in range(REPS):
                 model_hvkg,args["q"],problem,cost_model,standard_bounds,objective_indices,ncons=args["ncons"],nobj=args["nobj"],train_x=train_X_full
             )
 
-            #Constraint Handling
-            """
-            if args["ncons"] > 0:
-                new_cons=cons(new_x_hvkg)
-                new_obj_hvkg=torch.column_stack((new_obj_hvkg,new_cons))#Combining into objectives+cons
-
-                #feasibility 
-                ind_feasible = (new_obj_hvkg[..., -args["ncons"] :] >= 0).all(dim=-1)
-                new_obj_hvkg[~ind_feasible.squeeze(), : args["nobj"]] = -1e12  # Penalize infeasible points
-            """
-
-            #print("train_obj_hvkg_list[0].shape",train_obj_hvkg_list[0].shape) #### Error here on cat shapes (probably from new_obj_hvkg generation)
-            #print("new_obj_hvkg.shape",new_obj_hvkg.shape)
-            #print("eval index",eval_objective_indices_hvkg)
+            #Constraints handled in optimize, new_obj_hvkg has constraints in it
+            
             # update training points
             for i in eval_objective_indices_hvkg:
                 train_x_hvkg_list[i] = torch.cat([train_x_hvkg_list[i], new_x_hvkg])
@@ -441,7 +432,7 @@ for REP in range(REPS):
 
             t2 = time.time()
             times.append(t2 - t1)
-            print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
+            print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
             file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
     #qNEHVI        
@@ -469,7 +460,7 @@ for REP in range(REPS):
         # compute hypervolume
         hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ncons=args["ncons"],ref_point=args["ref_point"],maximize=True,)
         hvs_qnehvi= [hv]
-        print("Initial Hypervolume is: ",hv,flush=True)
+        print("Initial Hypervolume is: ",true_hv,flush=True)
         times = []
         for iter in range(args["iters"]):
             t1 = time.time()
@@ -478,16 +469,13 @@ for REP in range(REPS):
             new_x_qnehvi, new_obj_qnehvi = optimize_qnehvi_and_get_observation(
                 model_qnehvi, train_x_qnehvi_list[0], qnehvi_sampler, q=args["q"], problem=problem,standard_bounds=standard_bounds,ncons=args["ncons"],nobj=args["nobj"]
             )
-            #print("new_obj_qnehvi",new_obj_qnehvi)
+            #new_obj_qnehvi does not have constraints added to it yet
 
             #Constraint Handling
             if args["ncons"] > 0:
                 new_cons=cons(new_x_qnehvi)
                 new_obj_qnehvi=torch.column_stack((new_obj_qnehvi,new_cons))#Combining into objectives+cons
 
-                #feasibility 
-                ind_feasible = (new_obj_qnehvi[..., -args["ncons"] :] >= 0).all(dim=-1)
-                new_obj_qnehvi[~ind_feasible.squeeze(), : args["nobj"]] = -1e12  # Penalize infeasible points
             
             #print("cons new_obj_qnehvi",new_obj_qnehvi)
             
@@ -523,7 +511,7 @@ for REP in range(REPS):
             
             t2 = time.time()
             times.append(t2 - t1)
-            print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
+            print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
             file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
     elif acquisition_function == "sobol":
         from botorch import fit_gpytorch_mll
@@ -548,7 +536,7 @@ for REP in range(REPS):
         hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ncons=args["ncons"],ref_point=args["ref_point"],maximize=True,)
         hvs_random= [hv]
 
-        print("Initial Hypervolume is: ",hv,flush=True)
+        print("Initial Hypervolume is: ",true_hv,flush=True)
         times = []
         for iter in range(args["iters"]):
             t1 = time.time()
@@ -556,10 +544,6 @@ for REP in range(REPS):
             if args["ncons"] > 0:
                 new_cons=cons(new_x_random)
                 new_obj_random=torch.column_stack((new_obj_random,new_cons))#Combining into objectives+cons
-
-                #feasibility 
-                ind_feasible = (new_obj_random[..., -args["ncons"] :] >= 0).all(dim=-1)
-                new_obj_random[~ind_feasible.squeeze(), : args["nobj"]] = -1e12  # Penalize infeasible points
             
             # update training points
             for i in objective_indices:
@@ -592,7 +576,7 @@ for REP in range(REPS):
 
             t2 = time.time()
             times.append(t2 - t1)
-            print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
+            print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
             file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
     #Sobol Decoupled
     elif acquisition_function == "sobol_dec":
@@ -618,21 +602,14 @@ for REP in range(REPS):
         hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ncons=args["ncons"],ref_point=args["ref_point"],maximize=True,)
         hvs_random= [hv]
 
-        print("Initial Hypervolume is: ",hv,flush=True)
+        print("Initial Hypervolume is: ",true_hv,flush=True)
         times = []
         for iter in range(args["iters"]):
             t1 = time.time()
             new_x_random, new_obj_random = generate_sobol_data(n=args["q"],problem=problem)
             if args["ncons"] > 0:
                 new_cons=cons(new_x_random)
-                #print("new_cons",new_cons)
-                #print("new_obj_random",new_obj_random)
                 new_obj_random=torch.column_stack((new_obj_random,new_cons))#Combining into objectives+cons
-
-                #feasibility 
-                ind_feasible = (new_obj_random[..., -args["ncons"] :] >= 0).all(dim=-1)
-                new_obj_random[~ind_feasible.squeeze(), : args["nobj"]] = -1e12  # Penalize infeasible points
-                #print("new_obj_random post",new_obj_random)
 
             rand_tasks = torch.randint(
                 low=0,
@@ -676,7 +653,7 @@ for REP in range(REPS):
 
             t2 = time.time()
             times.append(t2 - t1)
-            print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
+            print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
             file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
 

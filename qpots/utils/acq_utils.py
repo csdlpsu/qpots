@@ -141,7 +141,6 @@ def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_boun
             num_fantasies=8, #From their implementation
             num_pareto=10, #From their implementation
             objective=mc_objective,
-            #constraints=[lambda Z, i=i: -Z[..., i] for i in range(-ncons, 0)], # qNEHVI expects negative constraints to be feasible, but we consider positive constraints to be feasible, so negating the constraint lambda functions 
             current_value=current_value,
             cost_aware_utility=cost_aware_utility,
         )
@@ -202,7 +201,7 @@ def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_boun
     #print("new_obj in HVKG",new_obj)
     #print("new_obj in HVKG shape",new_obj.shape)
     if ncons>0:
-        new_con = problem._evaluate_slack_true(new_x)
+        new_con = problem._evaluate_slack_true(new_x) #Getting Constraint
         #print(new_con)
         #print(new_con.shape)
         new_obj = torch.column_stack([new_obj,new_con])

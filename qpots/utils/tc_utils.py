@@ -47,35 +47,31 @@ def get_model_identified_hv_maximizing_set(
     dim = problem.dim
     population_size=100*dim*multiplier
     seed=2429+multiplier
-    #print("population size:", population_size,flush=True)
 
     class PosteriorMeanPymooProblem(Problem):
         def __init__(self):
             super().__init__(
                 n_var=dim,
                 n_obj=problem.nobj,
+                n_ieq_constr=ncons, #2/9 Newline
                 type_var=np.double,
             )
             self.xl = np.zeros(dim)
             self.xu = np.ones(dim)
 
         def _evaluate(self, x, out, *args, **kwargs):
-            #torch.manual_seed(2439) #Setting same seed to see if its the same now? for sampling for posterior optimization
             X = torch.from_numpy(x).to(**tkwargs)
             y = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
-            #print("y posterior sample full shape in pymoo:",y.shape)
 
-            #Constraint Handling
+            ## Constraint Handling
             if ncons > 0:
-                ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
-                #print("y[..., -ncons :] : \n",y[..., -ncons :])
-                #print("ind_feasible: \n",ind_feasible)
-                y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
-                y = y[..., : problem.nobj]
-                #print("y after cons filtering shape in pymoo:",y.shape)
+                f = y[..., : problem.nobj]
+                g = y[..., -ncons :] #2/9 Newline
+                out["G"] = -g.cpu().numpy() #2/9 Newline
+
 
             #print("evaluate post sample:\n",y)                    
-            out["F"] = -y.cpu().numpy()
+            out["F"] = -f.cpu().numpy()
 
     pymoo_problem = PosteriorMeanPymooProblem()
     algorithm = NSGA2(
