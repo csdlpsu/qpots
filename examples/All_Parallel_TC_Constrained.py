@@ -162,6 +162,8 @@ elif func_sent=="zdt2":
     problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="zdt3":
     problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz2":
+    problem = DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz3":
     problem = DTLZ3(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz7":
@@ -174,8 +176,12 @@ elif func_sent=="carside":
     problem = CarSideImpact(negate=True).to(device=device, dtype=dtype)
 elif func_sent=="constrainedbc":
     problem = ConstrainedBraninCurrin(negate=True).to(device=device, dtype=dtype)
-elif func_sent=="discbrake":
+elif func_sent=='discbrake':
     problem = DiscBrake(negate=True).to(device=device, dtype=dtype)
+elif func_sent=='osy':
+    problem = OSY(negate=True).to(device=device, dtype=dtype)
+elif func_sent=='mw7':
+    problem = MW7(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
@@ -194,14 +200,14 @@ for REP in range(REPS):
         # set up the training points
         torch.manual_seed(manual_seed+REP)
 
-        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double,device=device)
         train_Y = f(unnormalize(train_X, bounds))
 
         #Constraint Handling:
         if args["ncons"] > 0:
             cons = tf.get_cons()
             train_Y = torch.column_stack([train_Y, cons(unnormalize(train_X, bounds))])
-            print("training y with constraints:\n",train_Y)
+            #print("training y with constraints:\n",train_Y)
 
         train_X_full = train_X.clone()
         train_Y_full = train_Y.clone()
@@ -234,6 +240,7 @@ for REP in range(REPS):
             for iter in range(args["iters"]):
                 t1 = time.time() # tracking time
                 
+                temp_timer=time.time()
                 for multiplier in range(max_NSGA_iters):
                     print("using Multiplier: ", multiplier+1,flush=True)
                     res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1,ncons=args["ncons"])
@@ -243,8 +250,9 @@ for REP in range(REPS):
 
                     if res.X.shape[0] >= args["q"]:
                         break
+                    print(f"Inner time:{time.time()-temp_timer}")
                 else:
-                    raise RuntimeError("Could not get q candidates after max_tries")
+                    raise RuntimeError(f"Could not get q candidates after max_tries on rep: {REP} on rank: {rank}")
                 
 
                 
@@ -353,6 +361,7 @@ for REP in range(REPS):
                         tag="thresh"
                 else:
                     tag="Model_list"
+                print(f"saving file on Rep: {REP}, rank: {rank}")
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
                 np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_exception_handling_NSGA.npy", NSGA_expansion_counter)
                 np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_Non_invertible_counter.npy", Non_invertible_counter)

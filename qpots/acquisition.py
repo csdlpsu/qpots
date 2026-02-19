@@ -241,7 +241,7 @@ class Acquisition:
         model=gps.models[0]
         #Do not need appending of task IDS for posterior sampling:
         Ys_=model.posterior(normalize(x,gps.bounds)).sample() #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
-        Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
+        #Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
         
         if self.ncons > 0:
             ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)

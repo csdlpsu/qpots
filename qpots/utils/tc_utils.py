@@ -29,6 +29,7 @@ from botorch.models import MultiTaskGP
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 from gpytorch.mlls import ExactMarginalLogLikelihood
+from botorch.sampling import SobolQMCNormalSampler
 
 def get_model_identified_hv_maximizing_set(
     model,
@@ -39,7 +40,7 @@ def get_model_identified_hv_maximizing_set(
     ncons=0
     
 ):
-    """Optimize the posterior mean using NSGA-II."""
+    """Optimize the posterior sample using NSGA-II."""
     tkwargs = {
         "dtype": ref_point.dtype,
         "device": ref_point.device,
@@ -53,22 +54,42 @@ def get_model_identified_hv_maximizing_set(
             super().__init__(
                 n_var=dim,
                 n_obj=problem.nobj,
-                n_ieq_constr=ncons, #2/9 Newline
+                #n_ieq_constr=ncons, #2/9 Newline
                 type_var=np.double,
             )
             self.xl = np.zeros(dim)
             self.xu = np.ones(dim)
+            self.sampler = SobolQMCNormalSampler(
+                sample_shape=torch.Size([1]), 
+                seed=seed
+            ) # Sampler for consistency when calling _evaluate()
 
         def _evaluate(self, x, out, *args, **kwargs):
             X = torch.from_numpy(x).to(**tkwargs)
-            y = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
+
+            #y = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
+            with torch.no_grad():
+                posterior = model.posterior(X)
+                y = self.sampler(posterior)  # shape: [1, N, m]
+                y = y.squeeze(0)
+            
 
             ## Constraint Handling
             if ncons > 0:
                 f = y[..., : problem.nobj]
+                #print(f.shape)
                 g = y[..., -ncons :] #2/9 Newline
-                out["G"] = -g.cpu().numpy() #2/9 Newline
 
+                #penalizing constraint violation
+                penalty_value = -1e12  
+                violation_mask = (g < 0).any(dim=-1)  # shape (...,)
+                mask_expanded = violation_mask.unsqueeze(-1).expand_as(f)
+                f = torch.where(mask_expanded, torch.full_like(f, penalty_value), f)
+
+                #out["G"] = -g.cpu().numpy() #2/9 Newline
+            else:
+                f=y
+                #print(f.shape)
 
             #print("evaluate post sample:\n",y)                    
             out["F"] = -f.cpu().numpy()
@@ -81,7 +102,7 @@ def get_model_identified_hv_maximizing_set(
     res = minimize(
         pymoo_problem,
         algorithm,
-        # termination=MaximumGenerationTermination(max_gen),
+        ("n_gen", max_gen),
         pop_size=population_size,
         seed=seed,
         verbose=False,

@@ -113,7 +113,11 @@ from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
 from qpots.utils.tc_utils import get_model_identified_hv_maximizing_set, qmaximin, computeTC, argmax_mi_subset_bruteforce
 from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true_hypervolume
-from botorch.test_functions.multi_objective import BraninCurrin, ZDT2, ZDT3, DTLZ3, DTLZ7, Penicillin, VehicleSafety, CarSideImpact
+from botorch.test_functions.multi_objective import (
+    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
+    VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+)
 
 
 dtype = torch.double
@@ -155,6 +159,8 @@ elif func_sent=="zdt2":
     problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="zdt3":
     problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz2":
+    problem = DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz3":
     problem = DTLZ3(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz7":
@@ -190,7 +196,7 @@ for REP in range(REPS):
 
         #Treu HV and full train_y even when decoupled for plotting
         True_coupled_train_y = train_Y.clone()
-        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
         true_hvs=[true_hv]
         
         ### qPOTS ###
@@ -207,6 +213,7 @@ for REP in range(REPS):
                 task_feature=-1,
                 ref_point=args["ref_point"], # length K
                 maximize=True,
+    
             )
             hvs = [hv]
             times = []
@@ -269,7 +276,7 @@ for REP in range(REPS):
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(unnormalize(x_new, bounds))
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
                 
                 gps = ModelObject(train_X_full, train_Y_full, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
@@ -338,7 +345,7 @@ for REP in range(REPS):
             
             # compute hypervolume
             #hv = get_model_identified_hv_maximizing_set(model=model_hvkg)
-            hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+            hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
             print("Initial Hypervolume is: ",hv,flush=True)
             hvs_hvkg= [hv]
             times = []
@@ -352,7 +359,7 @@ for REP in range(REPS):
                     new_obj_hvkg,
                     eval_objective_indices_hvkg,
                 ) = optimize_HVKG_and_get_obs_decoupled(
-                    model_hvkg,args["q"],problem,cost_model,standard_bounds,objective_indices
+                    model_hvkg,args["q"],problem,cost_model,standard_bounds,objective_indices,ncons=args["ncons"],nobj=args["nobj"],train_x=train_X_full
                 )
                 # update training points
                 for i in eval_objective_indices_hvkg:
@@ -372,13 +379,13 @@ for REP in range(REPS):
                 
                 fit_gpytorch_mll(mll_hvkg)
                 #hv = get_model_identified_hv_maximizing_set(model=model_hvkg)
-                hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+                hv = hypervolume_from_posterior_mean_gp(model=model_hvkg,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
                 hvs_hvkg.append(hv)
 
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(new_x_hvkg)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
 
                 t2 = time.time()
@@ -412,7 +419,7 @@ for REP in range(REPS):
             
             # compute hypervolume
             
-            hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+            hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
             hvs_qnehvi= [hv]
             print("Initial Hypervolume is: ",hv,flush=True)
             times = []
@@ -421,7 +428,7 @@ for REP in range(REPS):
                 qnehvi_sampler = SobolQMCNormalSampler(sample_shape=torch.Size([128]))
                 # generate candidates
                 new_x_qnehvi, new_obj_qnehvi = optimize_qnehvi_and_get_observation(
-                    model_qnehvi, train_x_qnehvi_list[0], qnehvi_sampler, q=args["q"], problem=problem,standard_bounds=standard_bounds
+                    model_qnehvi, train_x_qnehvi_list[0], qnehvi_sampler, q=args["q"], problem=problem,standard_bounds=standard_bounds,ncons=args["ncons"],nobj=args["nobj"]
                 )
                 # update training points
                 for i in objective_indices:
@@ -436,14 +443,14 @@ for REP in range(REPS):
                 )
                 fit_gpytorch_mll(mll_qnehvi)
                 #hv = get_model_identified_hv_maximizing_set(model=model_qnehvi)
-                hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+                hv = hypervolume_from_posterior_mean_gp(model=model_qnehvi,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
 
                 hvs_qnehvi.append(hv)
 
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(new_x_qnehvi)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
                 
                 t2 = time.time()
@@ -470,7 +477,7 @@ for REP in range(REPS):
             fit_gpytorch_mll(mll_random)
             
             # compute hypervolume
-            hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+            hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
             hvs_random= [hv]
 
             print("Initial Hypervolume is: ",hv,flush=True)
@@ -495,14 +502,14 @@ for REP in range(REPS):
                 )
                 fit_gpytorch_mll(mll_random)
                 #hv = get_model_identified_hv_maximizing_set(model=model_random)
-                hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+                hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
 
                 hvs_random.append(hv)
 
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(new_x_random)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
 
                 t2 = time.time()
@@ -530,7 +537,7 @@ for REP in range(REPS):
             fit_gpytorch_mll(mll_random)
             
             # compute hypervolume
-            hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+            hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
             hvs_random= [hv]
 
             print("Initial Hypervolume is: ",hv,flush=True)
@@ -561,14 +568,14 @@ for REP in range(REPS):
                 )
                 fit_gpytorch_mll(mll_random)
                 #hv = get_model_identified_hv_maximizing_set(model=model_random)
-                hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,)
+                hv = hypervolume_from_posterior_mean_gp(model=model_random,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
 
                 hvs_random.append(hv)
 
                 #Update true HV using true coupled train_y
                 coupled_new_y=f(new_x_random)
                 True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
-                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],maximize=True)
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
 
                 t2 = time.time()

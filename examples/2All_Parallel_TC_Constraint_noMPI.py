@@ -155,6 +155,8 @@ elif func_sent=="zdt2":
     problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="zdt3":
     problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz2":
+    problem = DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz3":
     problem = DTLZ3(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz7":
@@ -169,6 +171,10 @@ elif func_sent=="constrainedbc":
     problem = ConstrainedBraninCurrin(negate=True).to(device=device, dtype=dtype)
 elif func_sent=='discbrake':
     problem = DiscBrake(negate=True).to(device=device, dtype=dtype)
+elif func_sent=='osy':
+    problem = OSY(negate=True).to(device=device, dtype=dtype)
+elif func_sent=='mw7':
+    problem = MW7(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
@@ -188,7 +194,7 @@ for REP in range(REPS):
     if args["ncons"] > 0:
         cons = tf.get_cons()
         train_Y = torch.column_stack([train_Y, cons(unnormalize(train_X, bounds))])
-        print("training y with constraints:\n",train_Y)
+        #print("training y with constraints:\n",train_Y)
 
     train_X_full = train_X.clone()
     train_Y_full = train_Y.clone()
@@ -221,24 +227,28 @@ for REP in range(REPS):
         for iter in range(args["iters"]):
             t1 = time.time() # tracking time
             
+            temp_timer=time.time()
+
             for multiplier in range(max_NSGA_iters):
-                print("using Multiplier: ", multiplier+1,flush=True)
-                res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1,ncons=args["ncons"])
-                print("res.X.shape[0]:", res.X.shape[0],flush=True)
+                inner_timer=time.time()
+                print("using Multiplier: ", multiplier+1, flush=True)
+                res, _ = get_model_identified_hv_maximizing_set(mt_model, problem=tf, ref_point=args["ref_point"], multiplier=multiplier+1, ncons=args["ncons"],max_gen=args["ngen"])
+                print("res.X.shape[0]:", res.X.shape[0], flush=True)
                 if multiplier>1:
                     NSGA_expansion_counter+=1
 
                 if res.X.shape[0] >= args["q"]:
                     break
+                print(f"Inner NSGA took: {time.time()-inner_timer}")
             else:
-                raise RuntimeError("Could not get q candidates after max_tries")
-            
+                raise RuntimeError(f"Could not get q candidates after max_tries on rep: {REP}")
+            print(f"NSGA took: {time.time()-temp_timer}")
 
             
             x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
             xnew_size=x_new.shape[0]
 
-            
+            temp_timer=time.time()
             if partial_sent:
                 print("Using Partial Evaluation",flush=True)
                 tc_i = []
@@ -294,6 +304,7 @@ for REP in range(REPS):
                     fx=torch.column_stack((fx,fc))#Combining into objectives+cons
                     
                 y_new = fx
+            print(f"New point acquisition took: {temp_timer-time.time()}")
 
             train_X_full = torch.row_stack([train_X_full, x_new])
             train_Y_full = torch.row_stack([train_Y_full, y_new])
@@ -311,18 +322,20 @@ for REP in range(REPS):
             true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True) #taking only the objective points for HV computation
             true_hvs.append(true_hv)
             
+            temp_timer=time.time()
             gps = ModelObject(train_X_full, train_Y_full, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
             gps.fit_multitask_gp()
             mt_model=gps.models[0]
+            print(f"Model Fitting took: {temp_timer-time.time()}")
 
-            hv = hypervolume_from_posterior_mean_mtgp(
+            """hv = hypervolume_from_posterior_mean_mtgp(
                 mt_model,
                 X=train_X_full,                 # (n, d)
                 task_feature=-1,
                 ref_point=args["ref_point"], # length K
                 maximize=True,
             )
-            hvs.append(hv)
+            hvs.append(hv)"""
 
             t2 = time.time()
             times.append(t2 - t1)
@@ -340,6 +353,7 @@ for REP in range(REPS):
                     tag="thresh"
             else:
                 tag="Model_list"
+            print(f"saving file on Rep: {REP}")
             file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_Y_full,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
             np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_exception_handling_NSGA.npy", NSGA_expansion_counter)
             np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_Non_invertible_counter.npy", Non_invertible_counter)
