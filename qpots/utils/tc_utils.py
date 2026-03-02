@@ -31,13 +31,36 @@ from botorch.fit import fit_gpytorch_mll
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.sampling import SobolQMCNormalSampler
 
+def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
+    """
+    Reverse the standardization of output `Y` using the mean and standard deviation 
+    computed from the training data, works when NaN values are in the train_y tensor.
+
+    Parameters
+    ----------
+    Y : torch.Tensor
+        The standardized output tensor.
+    train_y : torch.Tensor
+        The training output data used to compute the mean and standard deviation.
+
+    Returns
+    -------
+    torch.Tensor
+        The unstandardized output tensor.
+    """
+    mean = torch.nanmean(train_y, dim=0)
+    std = torch.from_numpy(np.nanstd(train_y.cpu().numpy(), axis=0, ddof=1)).to(train_y)
+    return Y * std + mean
+
 def get_model_identified_hv_maximizing_set(
     model,
     problem,
     ref_point,
+    train_y, #adding train_y to pass for unsandardizing
     multiplier=1,
     max_gen=100,
-    ncons=0
+    ncons=0,
+
     
 ):
     """Optimize the posterior sample using NSGA-II."""
@@ -67,24 +90,31 @@ def get_model_identified_hv_maximizing_set(
         def _evaluate(self, x, out, *args, **kwargs):
             X = torch.from_numpy(x).to(**tkwargs)
 
-            #y = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
+            #wihout Sampler
+            #y_std = model.posterior(X).sample().reshape(-1,problem.nobj+ncons)
+
+            #With Sampler (Better)
+            #"""
             with torch.no_grad():
                 posterior = model.posterior(X)
-                y = self.sampler(posterior)  # shape: [1, N, m]
-                y = y.squeeze(0)
+                y_std = self.sampler(posterior)  # shape: [1, N, m]
+                y_std = y_std.squeeze(0)
+                #print("y_std\n",y_std[:5,:])
+            #"""
             
+            #unstandardizing posterior based on the sent train_y (should be the SAME as the one you use to train your GP)
+            y = unstandardize_ignore_nan(y_std, train_y.to(**tkwargs))
+            #print("y\n",y[:5,:])    
 
             ## Constraint Handling
             if ncons > 0:
-                f = y[..., : problem.nobj]
-                #print(f.shape)
-                g = y[..., -ncons :] #2/9 Newline
 
                 #penalizing constraint violation
-                penalty_value = -1e12  
-                violation_mask = (g < 0).any(dim=-1)  # shape (...,)
-                mask_expanded = violation_mask.unsqueeze(-1).expand_as(f)
-                f = torch.where(mask_expanded, torch.full_like(f, penalty_value), f)
+                ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
+                y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
+                f = y[..., : problem.nobj]
+                #print("f\n",f[:5,:])
+                
 
                 #out["G"] = -g.cpu().numpy() #2/9 Newline
             else:

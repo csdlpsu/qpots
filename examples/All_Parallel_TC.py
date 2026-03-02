@@ -107,7 +107,7 @@ from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill, mtgp_posterior_mean_hypervolume
 from qpots.function import Function
-from botorch.utils.transforms import unnormalize
+from botorch.utils.transforms import unnormalize, normalize
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
@@ -225,7 +225,7 @@ for REP in range(REPS):
                 
                 for multiplier in range(max_NSGA_iters):
                     print("using Multiplier: ",multiplier+1,flush=True)
-                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1)
+                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full,multiplier=multiplier+1)
                     print("res.X.shape[0]:", res.X.shape[0],flush=True)
                     if multiplier>1:
                         NSGA_expansion_counter+=1
@@ -295,9 +295,9 @@ for REP in range(REPS):
                 t2 = time.time()
                 times.append(t2 - t1)
                 if partial_sent:
-                    print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
+                    print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, tc {tc_i}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
                 else:
-                    print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
+                    print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {x_new}, newy {y_new}\n",flush=True) #iter output statement
                 if args["mt"]==1:
                     if args["threshold"] is None:
                         if args["partial_info"] == 1:
@@ -362,12 +362,13 @@ for REP in range(REPS):
                     model_hvkg,args["q"],problem,cost_model,standard_bounds,objective_indices,ncons=args["ncons"],nobj=args["nobj"],train_x=train_X_full
                 )
                 # update training points
+                new_x_hvkg_norm=normalize(new_x_hvkg,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in eval_objective_indices_hvkg:
-                    train_x_hvkg_list[i] = torch.cat([train_x_hvkg_list[i], new_x_hvkg])
+                    train_x_hvkg_list[i] = torch.cat([train_x_hvkg_list[i], new_x_hvkg_norm])
                     train_obj_hvkg_list[i] = torch.cat(
                         [train_obj_hvkg_list[i], new_obj_hvkg], dim=0
                     )
-                train_X_full=torch.cat([train_X_full,new_x_hvkg])
+                train_X_full=torch.cat([train_X_full,new_x_hvkg_norm])
                 
                 # update costs
                 all_outcome_cost = cost_model(new_x_hvkg)
@@ -390,7 +391,7 @@ for REP in range(REPS):
 
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_hvkg}, newy {new_obj_hvkg}\n",flush=True) #iter output statement
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_hvkg_list,hvs=hvs_hvkg,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
         #qNEHVI        
@@ -431,12 +432,13 @@ for REP in range(REPS):
                     model_qnehvi, train_x_qnehvi_list[0], qnehvi_sampler, q=args["q"], problem=problem,standard_bounds=standard_bounds,ncons=args["ncons"],nobj=args["nobj"]
                 )
                 # update training points
-                for i in objective_indices:
-                    train_x_qnehvi_list[i] = torch.cat([train_x_qnehvi_list[i], new_x_qnehvi])
+                new_x_qnehvi_norm=normalize(new_x_qnehvi,bounds) #normalizing the new_x to keep train_x normalized 2/23
+                for i in range(args["nobj"]+args["ncons"]):
+                    train_x_qnehvi_list[i] = torch.cat([train_x_qnehvi_list[i], new_x_qnehvi_norm])
                     train_obj_qnehvi_list[i] = torch.cat(
                         [train_obj_qnehvi_list[i], new_obj_qnehvi[..., i : i + 1]]
                     )
-                train_X_full=torch.cat([train_X_full,new_x_qnehvi])
+                train_X_full=torch.cat([train_X_full,new_x_qnehvi_norm])
                 
                 mll_qnehvi, model_qnehvi = initialize_model(
                     train_x_qnehvi_list, train_obj_qnehvi_list,bounds
@@ -455,7 +457,7 @@ for REP in range(REPS):
                 
                 t2 = time.time()
                 times.append(t2 - t1)
-                print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_qnehvi}, newy {new_obj_qnehvi}\n",flush=True) #iter output statement
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_qnehvi_list,hvs=hvs_qnehvi,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
         elif acquisition_function == "sobol":
             from botorch import fit_gpytorch_mll
@@ -486,12 +488,13 @@ for REP in range(REPS):
                 t1 = time.time()
                 new_x_random, new_obj_random = generate_sobol_data(n=args["q"],problem=problem)
                 # update training points
+                new_x_random_norm=normalize(new_x_random,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in objective_indices:
-                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random])
+                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random_norm])
                     train_obj_random_list[i] = torch.cat(
                         [train_obj_random_list[i], new_obj_random[..., i : i + 1]]
                     )
-                train_X_full=torch.cat([train_X_full,new_x_random])
+                train_X_full=torch.cat([train_X_full,new_x_random_norm])
                 # update costs
                 #new_cost_random = cost_model(new_x_random).sum(dim=-1)
                 #cost_random = torch.cat([cost_random, new_cost_random], dim=0)
@@ -554,14 +557,15 @@ for REP in range(REPS):
                 k=0
                 print("rand_tasks",rand_tasks,flush=True)
                 
+                new_x_random_norm=normalize(new_x_random,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in rand_tasks:
-                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random[k].unsqueeze(0)])
+                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random_norm[k].unsqueeze(0)])
                     
                     train_obj_random_list[i] = torch.cat(
                         [train_obj_random_list[i], new_obj_random[k, i].view(1,1)]
                     )
                     k+=1
-                train_X_full=torch.cat([train_X_full,new_x_random])
+                train_X_full=torch.cat([train_X_full,new_x_random_norm])
                 
                 mll_random, model_random = initialize_model(
                     train_x_random_list, train_obj_random_list, bounds

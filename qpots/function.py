@@ -1,7 +1,7 @@
 from botorch.test_functions.multi_objective import (
     BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2
 )
 #from examples.Fall_25_custom_functions import MultiFidelityCurrin, MultiFidelityForrester #Extra Multi-Fidelity Test functions 9/29
 from botorch.test_functions.synthetic import Branin
@@ -84,6 +84,7 @@ class Function:
             "branincurrin": lambda: BraninCurrin(negate=True),
             "dtlz1": lambda: DTLZ1(self.dim, num_objectives=self.nobj, negate=True),
             "dtlz2": lambda: DTLZ2(self.dim, num_objectives=self.nobj, negate=True),
+            "c2dtlz2": lambda: C2DTLZ2(self.dim, num_objectives=self.nobj, negate=True),
             "dtlz3": lambda: DTLZ3(self.dim, num_objectives=self.nobj, negate=False),
             "dtlz7": lambda: DTLZ7(self.dim, num_objectives=self.nobj, negate=True),
             "dh1": lambda: DH1(self.dim, negate=True),
@@ -94,7 +95,7 @@ class Function:
             "zdt3": lambda: ZDT3(dim=self.dim, num_objectives=self.nobj, negate=True),
             "zdt2": lambda: ZDT2(dim=self.dim, num_objectives=self.nobj, negate=True),
             "constrainedbc": lambda: ConstrainedBraninCurrin(negate=True),
-            "discbrake": lambda: DiscBrake(),
+            "discbrake": lambda: DiscBrake(negate=True),
             "mw7": lambda: MW7(dim=self.dim, negate=True),
             "osy": lambda: OSY(negate=True),
             "weldedbeam": lambda: WeldedBeam(negate=True),

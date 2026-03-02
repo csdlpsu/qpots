@@ -110,7 +110,7 @@ from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill, mtgp_posterior_mean_hypervolume
 from qpots.function import Function
-from botorch.utils.transforms import unnormalize
+from botorch.utils.transforms import unnormalize,normalize
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 from botorch.utils.multi_objective.pareto import is_non_dominated
@@ -119,7 +119,7 @@ from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true
 from botorch.test_functions.multi_objective import (
     BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2
 )
 from botorch.exceptions.errors import ModelFittingError
 
@@ -182,6 +182,8 @@ elif func_sent=='osy':
     problem = OSY(negate=True).to(device=device, dtype=dtype)
 elif func_sent=='mw7':
     problem = MW7(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="c2dtlz2":   
+    problem = C2DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)          
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
@@ -243,7 +245,7 @@ for REP in range(REPS):
                 temp_timer=time.time()
                 for multiplier in range(max_NSGA_iters):
                     print("using Multiplier: ", multiplier+1,flush=True)
-                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],multiplier=multiplier+1,ncons=args["ncons"])
+                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full,multiplier=multiplier+1,ncons=args["ncons"])
                     print("res.X.shape[0]:", res.X.shape[0],flush=True)
                     if multiplier>1:
                         NSGA_expansion_counter+=1
@@ -280,8 +282,8 @@ for REP in range(REPS):
                                 fx = f(unnormalize(x_new[i], bounds)).unsqueeze(0) #Function objectives at x_i
                                 #print(fx.shape)
                                 if args["ncons"] > 0:
-                                    fc=cons(unnormalize(x_new[i], bounds)).unsqueeze(0) #Constraints at x_i
-                                    print(fx.shape)
+                                    fc=cons(unnormalize(x_new[i], bounds).unsqueeze(0)) #Constraints at x_i
+                                    #print(fx.shape)
                                     fx=torch.column_stack((fx,fc)).squeeze()#Combining into objectives+cons
 
                                 #print("S",S)
@@ -294,14 +296,14 @@ for REP in range(REPS):
                                 tc_i.append(torch.abs(tc).item())
                                 fx=f(unnormalize(x_new[i], bounds)).unsqueeze(0)
                                 if args["ncons"] > 0:
-                                    fc=cons(unnormalize(x_new[i], bounds)).unsqueeze(0) #Constraints at x_i
+                                    fc=cons(unnormalize(x_new[i], bounds).unsqueeze(0)) #Constraints at x_i
                                 
                                     fx=torch.column_stack((fx,fc))#Combining into objectives+cons
                                 y_new[i] = fx
                         else: #When R isnt invertible, perform joint evaluation at x
                             fx=f(unnormalize(x_new[i], bounds)).unsqueeze(0)
                             if args["ncons"] > 0:
-                                fc=cons(unnormalize(x_new[i], bounds)).unsqueeze(0) #Constraints at x_i
+                                fc=cons(unnormalize(x_new[i], bounds).unsqueeze(0)) #Constraints at x_i
                                 #print(fx.shape)
                                 fx=torch.column_stack((fx,fc))#Combining into objectives+cons
                             y_new[i] = fx
@@ -427,12 +429,13 @@ for REP in range(REPS):
                 #Constraints handled in optimize, new_obj_hvkg has constraints in it
                 
                 # update training points
+                new_x_hvkg_norm=normalize(new_x_hvkg,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in eval_objective_indices_hvkg:
-                    train_x_hvkg_list[i] = torch.cat([train_x_hvkg_list[i], new_x_hvkg])
+                    train_x_hvkg_list[i] = torch.cat([train_x_hvkg_list[i], new_x_hvkg_norm])
                     train_obj_hvkg_list[i] = torch.cat(
                         [train_obj_hvkg_list[i], new_obj_hvkg], dim=0
                     )
-                train_X_full=torch.cat([train_X_full,new_x_hvkg])
+                train_X_full=torch.cat([train_X_full,new_x_hvkg_norm])
                 #print("train_y_post",train_obj_hvkg_list)
 
                 # update costs
@@ -526,12 +529,13 @@ for REP in range(REPS):
                 #print("cons new_obj_qnehvi",new_obj_qnehvi)
                 
                 # update training points
+                new_x_qnehvi_norm=normalize(new_x_qnehvi,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in range(args["nobj"]+args["ncons"]):
-                    train_x_qnehvi_list[i] = torch.cat([train_x_qnehvi_list[i], new_x_qnehvi])
+                    train_x_qnehvi_list[i] = torch.cat([train_x_qnehvi_list[i], new_x_qnehvi_norm])
                     train_obj_qnehvi_list[i] = torch.cat(
                         [train_obj_qnehvi_list[i], new_obj_qnehvi[..., i : i + 1]]
                     )
-                train_X_full=torch.cat([train_X_full,new_x_qnehvi])
+                train_X_full=torch.cat([train_X_full,new_x_qnehvi_norm])
                 
                 #print("Updated training objs",train_obj_qnehvi_list)
                 mll_qnehvi, model_qnehvi = initialize_model(
@@ -608,12 +612,13 @@ for REP in range(REPS):
                     new_obj_random=torch.column_stack((new_obj_random,new_cons))#Combining into objectives+cons
                 
                 # update training points
+                new_x_random_norm=normalize(new_x_random,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in objective_indices:
-                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random])
+                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random_norm])
                     train_obj_random_list[i] = torch.cat(
                         [train_obj_random_list[i], new_obj_random[..., i : i + 1]]
                     )
-                train_X_full=torch.cat([train_X_full,new_x_random])
+                train_X_full=torch.cat([train_X_full,new_x_random_norm])
                 
                 mll_random, model_random = initialize_model(
                     train_x_random_list, train_obj_random_list, bounds
@@ -701,14 +706,15 @@ for REP in range(REPS):
                 k=0
                 print("rand_tasks",rand_tasks,flush=True)
                 
+                new_x_random_norm=normalize(new_x_random,bounds) #normalizing the new_x to keep train_x normalized 2/23
                 for i in rand_tasks:
-                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random[k].unsqueeze(0)])
+                    train_x_random_list[i] = torch.cat([train_x_random_list[i], new_x_random_norm[k].unsqueeze(0)])
                     
                     train_obj_random_list[i] = torch.cat(
                         [train_obj_random_list[i], new_obj_random[k, i].view(1,1)]
                     )
                     k+=1
-                train_X_full=torch.cat([train_X_full,new_x_random])
+                train_X_full=torch.cat([train_X_full,new_x_random_norm])
                 
                 mll_random, model_random = initialize_model(
                     train_x_random_list, train_obj_random_list, bounds

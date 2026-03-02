@@ -196,6 +196,7 @@ def optimize_HVKG_and_get_obs_decoupled(model,q,problem,cost_model,standard_boun
     candidates = objective_candidates[best_objective_index] #choosing the corresponding candidate point, x, at the best vals
     vals = objective_vals[best_objective_index]
     # observe new values
+    #new_x_norm=candidates.clone()
     new_x = unnormalize(candidates.detach(), bounds=problem.bounds)
     new_obj = problem(new_x)
     #print("new_obj in HVKG",new_obj)
