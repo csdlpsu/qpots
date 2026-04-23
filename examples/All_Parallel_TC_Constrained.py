@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 This example demonstrates how to use qPOTS on a BoTorch multiobjective test function called BraninCurrin.
 This is not an HPC implementation.
@@ -119,7 +120,7 @@ from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true
 from botorch.test_functions.multi_objective import (
     BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2,BNH,SRN,CONSTR
 )
 from botorch.exceptions.errors import ModelFittingError
 
@@ -183,7 +184,15 @@ elif func_sent=='osy':
 elif func_sent=='mw7':
     problem = MW7(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="c2dtlz2":   
-    problem = C2DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)          
+    problem = C2DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)     
+elif func_sent=="weldedbeam":
+    problem = WeldedBeam(negate=True).to(device=device, dtype=dtype)     
+elif func_sent=="srn":
+    problem = SRN(negate=False).to(device=device, dtype=dtype) 
+elif func_sent=="constr":
+    problem = CONSTR(negate=True).to(device=device, dtype=dtype) 
+elif func_sent=="bnh":
+    problem = BNH(negate=False).to(device=device, dtype=dtype)      
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
@@ -750,6 +759,91 @@ for REP in range(REPS):
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
+        
+        elif acquisition_function == "pesmo":
+            from qpots.utils.acq_utils import *
+            from botorch import fit_gpytorch_mll
+
+            print("PESMO decoupled:\n",flush=True)
+            tag=acquisition_function
+
+            train_obj_list = list(train_Y.split(1, dim=-1))
+            train_x_list = [train_X] * len(train_obj_list)
+            mll, model = initialize_model(train_x_list, train_obj_list, bounds)
+
+            # fit the models
+            fit_gpytorch_mll(mll)
+           
+            # compute hypervolume
+            #hv = hypervolume_from_posterior_mean_gp(model=model,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
+            hv=true_hv
+            print("Initial Hypervolume is: ",hv,flush=True)
+            hvs= [hv]
+            times = []
+
+            options={
+                        "batch_limit": 5,
+                        "maxiter": 200,
+                        "with_grad": False, #Trying turning it off for PESMO only (on the botorch documentation)
+                    }
+
+            for iter in range(args["iters"]):
+                t1 = time.time()
+            
+                pareto_sets, pareto_fronts, hypercell_bounds = build_pareto_state(model, bounds)
+                # PESMO
+                choice = choose_competitive_decoupled_candidate(
+                    lambda mask: qDecoupledPESMO(
+                        model=model,
+                        pareto_sets=pareto_sets,
+                        maximize=True,
+                        X_evaluation_mask=mask,
+                    ),
+                    bounds=bounds,
+                    options=options,
+                    num_outputs=model.num_outputs,
+                    objective_costs=cost_sent,   # optional cost-aware selection, sent from arg parser
+                )
+                
+                X_next = choice["X"]
+                objective_idx = choice["objective_idx"]
+
+                Y_next=f(X_next.squeeze())
+                if args["ncons"] > 0:
+                    fc=cons(X_next.squeeze()) #Constraints at x_i
+                    #print(fx.shape)
+                    print(f"Checking sizes: Y_next:{Y_next.shape}, fc:{fc.shape}",flush=True)
+                    print(f"Checking actuals: Y_next:{Y_next}, fc:{fc}",flush=True)
+                    #Y_next=torch.column_stack((Y_next,fc))#Combining into objectives+cons
+                    Y_next=torch.cat([Y_next, fc])#Combining into objectives+cons
+                    print(f"Post cat checking size and vals: Y_next:{Y_next.shape}, Y_next:{Y_next}",flush=True)
+                    
+    
+                
+                train_x_list[objective_idx] = torch.cat([train_x_list[objective_idx], X_next])
+                train_obj_list[objective_idx] = torch.cat(
+                    [train_obj_list[objective_idx], Y_next[objective_idx].reshape(1, 1)], dim=0
+                ) 
+                
+                mll, model = initialize_model(train_x_list, train_obj_list, bounds)        
+                fit_gpytorch_mll(mll)
+
+                train_X_full=torch.cat([train_X_full,X_next])
+                
+
+                #Update true HV using true coupled train_y
+
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, Y_next])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
+                true_hvs.append(true_hv)
+
+                hv = true_hv
+                hvs.append(hv)
+
+                t2 = time.time()
+                times.append(t2 - t1)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {X_next}, newy {Y_next}, evaluated for objective {objective_idx}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_list,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
 #Wait for all to finish, then merge
 comm.Barrier()  

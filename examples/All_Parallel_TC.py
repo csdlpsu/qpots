@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 This example demonstrates how to use qPOTS on a BoTorch multiobjective test function called BraninCurrin.
 This is not an HPC implementation.
@@ -61,9 +62,9 @@ def arg_parser():
 
 # Saving Files
 def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,true_hvs,times,REP,coupled_y):
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full)
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full, dtype=object))
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y, dtype=object))
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full.detach().cpu())
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full.detach().cpu(), dtype=object))
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y.detach().cpu(), dtype=object))
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_hv.npy", hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_true_hv.npy", true_hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_times.npy", times)
@@ -85,7 +86,7 @@ manual_seed=args.start_seed
 acquisition_function=args.acq
 cost_sent=args.cost
 if len(cost_sent) != nobj_sent:
-    print("Warning: Need same number of costs as tasks for HVKG",flush=True)
+    print("Warning: Need same number of costs as tasks for HVKG and PESMO",flush=True)
 
 
 mtgp_sent=args.use_mtgp
@@ -114,9 +115,9 @@ from botorch.utils.multi_objective.pareto import is_non_dominated
 from qpots.utils.tc_utils import get_model_identified_hv_maximizing_set, qmaximin, computeTC, argmax_mi_subset_bruteforce
 from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp, compute_true_hypervolume
 from botorch.test_functions.multi_objective import (
-    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
+    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1,DH2,DH3,DH4, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+    ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam,ZDT1,DTLZ4,DTLZ5,ToyRobust,BNH,SRN,CONSTR
 )
 
 
@@ -135,7 +136,7 @@ args = dict(
         "reps": 20,
         "q": q_sent,
         "wd": "..",
-        "ref_point": torch.tensor(ref_point_sent),
+        "ref_point": torch.tensor(ref_point_sent).to(device),
         "dim": dim_sent,
         "nobj": nobj_sent,
         "ncons": ncons_sent,
@@ -151,18 +152,24 @@ args = dict(
 # Set up problem
 tf = Function(func_sent, dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
-bounds = tf.get_bounds()
+bounds = tf.get_bounds().to(device)
 
 if func_sent=="branincurrin":
     problem = BraninCurrin(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="zdt1":
+    problem = ZDT1(negate=False,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="zdt2":
-    problem = ZDT2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+    problem = ZDT2(negate=False,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="zdt3":
     problem = ZDT3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz2":
-    problem = DTLZ2(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+    problem = DTLZ2(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz3":
     problem = DTLZ3(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz4":
+    problem = DTLZ4(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="dtlz5":
+    problem = DTLZ5(negate=False,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="dtlz7":
     problem = DTLZ7(negate=True,dim=args["dim"],num_objectives=args["nobj"]).to(device=device, dtype=dtype)
 elif func_sent=="penicillin": 
@@ -171,6 +178,18 @@ elif func_sent=="vehicle":
     problem = VehicleSafety(negate=True).to(device=device, dtype=dtype)
 elif func_sent=="carside": 
     problem = CarSideImpact(negate=True).to(device=device, dtype=dtype)
+elif func_sent=="gmm":
+    problem = GMM(negate=True,num_objectives=args["nobj"]).to(device=device, dtype=dtype)
+elif func_sent=="dh1":
+    problem = DH1(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dh2":
+    problem = DH2(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dh3":
+    problem = DH3(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="dh4":
+    problem = DH4(negate=True,dim=args["dim"]).to(device=device, dtype=dtype)
+elif func_sent=="toyrobust":
+    problem = ToyRobust(negate=False).to(device=device, dtype=dtype)
 else:
     raise ValueError(f"Invalid argument: --func '{func_sent}'")
 
@@ -189,14 +208,14 @@ for REP in range(REPS):
         # set up the training points
         torch.manual_seed(manual_seed+REP)
 
-        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
-        train_Y = f(unnormalize(train_X, bounds))
+        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double, device=device)
+        train_Y = f(unnormalize(train_X.to("cpu"), bounds.to("cpu"))).to(dtype=train_X.dtype, device=device)
         train_X_full = train_X.clone()
         train_Y_full = train_Y.clone()
 
         #Treu HV and full train_y even when decoupled for plotting
         True_coupled_train_y = train_Y.clone()
-        true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
+        true_hv=compute_true_hypervolume(True_coupled_train_y.to(device),args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
         true_hvs=[true_hv]
         
         ### qPOTS ###
@@ -225,7 +244,7 @@ for REP in range(REPS):
                 
                 for multiplier in range(max_NSGA_iters):
                     print("using Multiplier: ",multiplier+1,flush=True)
-                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full,multiplier=multiplier+1)
+                    res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full.to(device),multiplier=multiplier+1)
                     print("res.X.shape[0]:", res.X.shape[0],flush=True)
                     if multiplier>1:
                         NSGA_expansion_counter+=1
@@ -237,45 +256,45 @@ for REP in range(REPS):
                 
 
                 
-                x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
+                x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"]).to(device)
                 xnew_size=x_new.shape[0]
 
                 
                 if partial_sent:
                     print("Using Partial Evaluation",flush=True)
                     tc_i = []
-                    y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+                    y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double,device=device) #torch.zeros(q, problem.num_objectives)
                     for i in range(xnew_size):
                         tc = computeTC(x_new[i],mt_model=mt_model)
 
                         if tc is not None: #tc is None when R is invertible
-                            if torch.abs(tc) > torch.tensor(args["threshold"]): #Perform partial eval at x when total correlation above given threshold
+                            if torch.abs(tc) > torch.tensor(args["threshold"],device=device): #Perform partial eval at x when total correlation above given threshold
                                 tc_i.append(torch.abs(tc).item())
 
                                 post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
                                 cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
-                                res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
+                                res = argmax_mi_subset_bruteforce(cov.detach().cpu(), assume_samples=False, base=2.0)
                 
                                 S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
-                                fx = f(unnormalize(x_new[i], bounds)).view(-1)
-                                y_new[i, S] = fx[S]
+                                fx = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).view(-1).to(dtype=y_new.dtype,device=device)
+                                y_new[i, S] = fx[S].to(device)
                                 
                             else: #when total correlation is below threshold, perform join evaluation at x
                                 tc_i.append(torch.abs(tc).item())
-                                y_new[i] = f(unnormalize(x_new[i], bounds))
+                                y_new[i] = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).to(device)
                         else: #When R is invertible, perform joint evaluation at x
-                            y_new[i] = f(unnormalize(x_new[i], bounds))
+                            y_new[i] = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).to(device)
                             Non_invertible_counter+=1
                 else:
                     print("Using Joint Evaluation",flush=True)
-                    y_new=f(unnormalize(x_new, bounds))
+                    y_new=f(unnormalize(x_new.to("cpu"), bounds.to("cpu"))).to(device)
 
-                train_X_full = torch.row_stack([train_X_full, x_new])
-                train_Y_full = torch.row_stack([train_Y_full, y_new])
+                train_X_full = torch.row_stack([train_X_full, x_new]).to(device)
+                train_Y_full = torch.row_stack([train_Y_full, y_new]).to(device)
 
                 #Update true HV using true coupled train_y
-                coupled_new_y=f(unnormalize(x_new, bounds))
-                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                coupled_new_y=f(unnormalize(x_new.to("cpu"), bounds.to("cpu"))).to(device)
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y]).to(device)
                 true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
                 true_hvs.append(true_hv)
                 
@@ -586,6 +605,82 @@ for REP in range(REPS):
                 times.append(t2 - t1)
                 print(f"iter {iter}, Time: {t2 - t1}, HV: {hv}, newx {new_x_random}, newy {new_obj_random}\n",flush=True) #iter output statement
                 file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_random_list,hvs=hvs_random,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
+        
+        elif acquisition_function == "pesmo":
+            from qpots.utils.acq_utils import *
+            from botorch import fit_gpytorch_mll
+
+            print("PESMO decoupled:\n",flush=True)
+            tag=acquisition_function
+
+            train_obj_list = list(train_Y.split(1, dim=-1))
+            train_x_list = [train_X] * len(train_obj_list)
+            mll, model = initialize_model(train_x_list, train_obj_list, bounds)
+
+            # fit the models
+            fit_gpytorch_mll(mll)
+           
+            # compute hypervolume
+            #hv = hypervolume_from_posterior_mean_gp(model=model,X=train_X_full,ref_point=args["ref_point"],maximize=True,ncons=args["ncons"],)
+            hv=true_hv
+            print("Initial Hypervolume is: ",hv,flush=True)
+            hvs= [hv]
+            times = []
+
+            options={
+                        "batch_limit": 5,
+                        "maxiter": 200,
+                        "with_grad": False, #Trying turning it off for PESMO only (on the botorch documentation)
+                    }
+
+            for iter in range(args["iters"]):
+                t1 = time.time()
+            
+                pareto_sets, pareto_fronts, hypercell_bounds = build_pareto_state(model, bounds)
+                # PESMO
+                choice = choose_competitive_decoupled_candidate(
+                    lambda mask: qDecoupledPESMO(
+                        model=model,
+                        pareto_sets=pareto_sets,
+                        maximize=True,
+                        X_evaluation_mask=mask,
+                    ),
+                    bounds=bounds,
+                    options=options,
+                    num_outputs=model.num_outputs,
+                    objective_costs=cost_sent,   # optional cost-aware selection, sent from arg parser
+                )
+                
+                X_next = choice["X"]
+                objective_idx = choice["objective_idx"]
+
+                Y_next=problem(X_next.squeeze())
+                #print(Y_next.shape)
+                
+                train_x_list[objective_idx] = torch.cat([train_x_list[objective_idx], X_next])
+                train_obj_list[objective_idx] = torch.cat(
+                    [train_obj_list[objective_idx], Y_next[objective_idx].reshape(1, 1)], dim=0
+                ) 
+                
+                mll, model = initialize_model(train_x_list, train_obj_list, bounds)        
+                fit_gpytorch_mll(mll)
+
+                train_X_full=torch.cat([train_X_full,X_next])
+                
+
+                #Update true HV using true coupled train_y
+                coupled_new_y=Y_next
+                True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+                true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
+                true_hvs.append(true_hv)
+
+                hv = true_hv
+                hvs.append(hv)
+
+                t2 = time.time()
+                times.append(t2 - t1)
+                print(f"iter {iter}, Time: {t2 - t1}, HV: {true_hv}, newx {X_next}, newy {Y_next}, evaluated for objective {objective_idx}\n",flush=True) #iter output statement
+                file_saving_inloop(func_sent=func_sent,tag=tag,train_X_full=train_X_full,train_Y_full=train_obj_list,hvs=hvs,true_hvs=true_hvs,times=times,REP=REP,coupled_y=True_coupled_train_y)
 
 #Wait for all to finish, then merge
 comm.Barrier()  

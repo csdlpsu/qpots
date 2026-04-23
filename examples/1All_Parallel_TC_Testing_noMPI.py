@@ -53,9 +53,9 @@ def arg_parser():
 
 # Saving Files
 def file_saving_inloop(func_sent,tag,train_X_full,train_Y_full,hvs,true_hvs,times,REP,coupled_y):
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full)
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full, dtype=object))
-    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y, dtype=object))
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_x.npy", train_X_full.detach().cpu())
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_train_y.npy", np.array(train_Y_full.detach().cpu(), dtype=object))
+    np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_coupled_y.npy", np.array(coupled_y.detach().cpu(), dtype=object))
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_hv.npy", hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_true_hv.npy", true_hvs)
     np.save(f"{args['wd']}/{REP}_{func_sent}_{tag}_times.npy", times)
@@ -123,7 +123,7 @@ args = dict(
         "reps": 20,
         "q": q_sent,
         "wd": "..",
-        "ref_point": torch.tensor(ref_point_sent),
+        "ref_point": torch.tensor(ref_point_sent).to(device),
         "dim": dim_sent,
         "nobj": nobj_sent,
         "ncons": ncons_sent,
@@ -139,7 +139,9 @@ args = dict(
 # Set up problem
 tf = Function(func_sent, dim=args["dim"], nobj=args["nobj"])
 f = tf.evaluate
-bounds = tf.get_bounds()
+bounds = tf.get_bounds().to(device)
+print(f"bounds: {bounds.device}")
+
 
 if func_sent=="branincurrin":
     problem = BraninCurrin(negate=True).to(device=device, dtype=dtype)
@@ -170,14 +172,19 @@ for REP in range(REPS):
     # set up the training points
     torch.manual_seed(manual_seed+REP)
 
-    train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
-    train_Y = f(unnormalize(train_X, bounds))
+    train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double, device=device)
+    print(f"train_X: {train_X.device}")
+    train_Y = f(unnormalize(train_X.to("cpu"), bounds.to("cpu"))).to(device)
+    print(f"train_Y: {train_Y.device}")
     train_X_full = train_X.clone()
+    print(f"train_X_full: {train_X_full.device}")
     train_Y_full = train_Y.clone()
+    print(f"train_Y_full: {train_Y_full.device}")
 
     #Treu HV and full train_y even when decoupled for plotting
     True_coupled_train_y = train_Y.clone()
-    true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
+    print(f"True_coupled_train_y: {True_coupled_train_y.device}")
+    true_hv=compute_true_hypervolume(True_coupled_train_y.to(device),args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
     true_hvs=[true_hv]
     
     ### qPOTS ###
@@ -187,6 +194,7 @@ for REP in range(REPS):
         gps = ModelObject(train_X, train_Y, bounds, args["nobj"], args["ncons"], args["ntrain"], device=device)
         gps.fit_multitask_gp()
         mt_model=gps.models[0]
+        
 
         hv = hypervolume_from_posterior_mean_mtgp(
             mt_model,
@@ -206,7 +214,7 @@ for REP in range(REPS):
             
             for multiplier in range(max_NSGA_iters):
                 print("using Multiplier: ",multiplier+1,flush=True)
-                res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full,multiplier=multiplier+1)
+                res, _ = get_model_identified_hv_maximizing_set(mt_model,problem=tf,ref_point=args["ref_point"],train_y=train_Y_full.to(device),multiplier=multiplier+1)
                 print("res.X.shape[0]:", res.X.shape[0],flush=True)
                 if multiplier>1:
                     NSGA_expansion_counter+=1
@@ -218,45 +226,45 @@ for REP in range(REPS):
             
 
             
-            x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
+            x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"]).to(device)
             xnew_size=x_new.shape[0]
 
             
             if partial_sent:
                 print("Using Partial Evaluation",flush=True)
                 tc_i = []
-                y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+                y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double,device=device) #torch.zeros(q, problem.num_objectives)
                 for i in range(xnew_size):
                     tc = computeTC(x_new[i],mt_model=mt_model)
 
                     if tc is not None: #tc is None when R is invertible
-                        if torch.abs(tc) > torch.tensor(args["threshold"]): #Perform partial eval at x when total correlation above given threshold
+                        if torch.abs(tc) > torch.tensor(args["threshold"],device=device): #Perform partial eval at x when total correlation above given threshold
                             tc_i.append(torch.abs(tc).item())
 
                             post = mt_model.posterior(x_new[i].view(-1,args["dim"]))
                             cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
-                            res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
+                            res = argmax_mi_subset_bruteforce(cov.detach().cpu(), assume_samples=False, base=2.0)
             
                             S = torch.tensor(res["S"], dtype=torch.long, device=y_new.device)
-                            fx = f(unnormalize(x_new[i], bounds)).view(-1)
-                            y_new[i, S] = fx[S]
+                            fx = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).view(-1).to(device)
+                            y_new[i, S] = fx[S].to(device)
                             
                         else: #when total correlation is below threshold, perform join evaluation at x
                             tc_i.append(torch.abs(tc).item())
-                            y_new[i] = f(unnormalize(x_new[i], bounds))
+                            y_new[i] = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).to(device)
                     else: #When R is invertible, perform joint evaluation at x
-                        y_new[i] = f(unnormalize(x_new[i], bounds))
+                        y_new[i] = f(unnormalize(x_new[i].to("cpu"), bounds.to("cpu"))).to(device)
                         Non_invertible_counter+=1
             else:
                 print("Using Joint Evaluation",flush=True)
-                y_new=f(unnormalize(x_new, bounds))
+                y_new=f(unnormalize(x_new.to("cpu"), bounds.to("cpu"))).to(device)
 
-            train_X_full = torch.row_stack([train_X_full, x_new])
-            train_Y_full = torch.row_stack([train_Y_full, y_new])
+            train_X_full = torch.row_stack([train_X_full, x_new]).to(device)
+            train_Y_full = torch.row_stack([train_Y_full, y_new]).to(device)
 
             #Update true HV using true coupled train_y
-            coupled_new_y=f(unnormalize(x_new, bounds))
-            True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y])
+            coupled_new_y=f(unnormalize(x_new.to("cpu"), bounds.to("cpu"))).to(device)
+            True_coupled_train_y = torch.row_stack([True_coupled_train_y, coupled_new_y]).to(device)
             true_hv=compute_true_hypervolume(True_coupled_train_y,args["ref_point"],nobj=args["nobj"],ncons=args["ncons"],maximize=True)
             true_hvs.append(true_hv)
             

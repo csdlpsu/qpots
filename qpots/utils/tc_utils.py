@@ -60,10 +60,105 @@ def get_model_identified_hv_maximizing_set(
     multiplier=1,
     max_gen=100,
     ncons=0,
+    
 
     
 ):
-    """Optimize the posterior sample using NSGA-II."""
+    """
+    Construct a Pymoo optimization problem that uses a GP posterior sample
+    to identify a hypervolume-maximizing set via NSGA-II.
+
+    This function defines an inner Pymoo `Problem` class whose objective
+    evaluations are derived from samples of the GP posterior. It is intended
+    to be used with evolutionary algorithms (e.g., NSGA-II) to approximate
+    the Pareto set that maximizes hypervolume under the learned model.
+
+    Parameters
+    ----------
+    model : ModelListGP or compatible GP model
+        A trained BoTorch model. Must support `.posterior(X)` and return
+        a posterior over all outputs (objectives + constraints).
+
+    problem : object
+        A problem definition containing:
+            - problem.dim  : int, input dimension (d)
+            - problem.nobj : int, number of objectives (m)
+
+    ref_point : torch.Tensor
+        Reference point for hypervolume computation.
+        Used externally (not directly inside `_evaluate`), but defines
+        dtype/device and objective dimensionality consistency.
+
+    train_y : torch.Tensor
+        Training outputs used to standardize the GP model.
+        Required here to *unstandardize* posterior samples so that
+        optimization is performed in the original objective space.
+
+    multiplier : int, optional (default=1)
+        Scales the population size:
+            population_size = 100 * dim * multiplier
+
+    max_gen : int, optional (default=100)
+        Maximum number of generations for the evolutionary algorithm.
+        (Used externally when running NSGA-II.)
+
+    ncons : int, optional (default=0)
+        Number of constraint outputs in the model.
+        Assumes constraints are the last `ncons` outputs.
+
+        Constraint convention:
+        - Feasible if constraint values >= 0
+        - Infeasible points are penalized in objective space
+
+    Returns
+    -------
+    PosteriorMeanPymooProblem : pymoo.core.problem.Problem
+        A configured Pymoo problem instance that can be passed to
+        NSGA-II or other evolutionary algorithms.
+
+    Internal Class: PosteriorMeanPymooProblem
+    ----------------------------------------
+    Defines the optimization problem evaluated by NSGA-II.
+
+    Key Features
+    ------------
+    - Decision variables:
+        x ∈ [0, 1]^d (assumes normalized design space)
+
+    - Objective evaluation:
+        1. Convert numpy input to torch tensor
+        2. Evaluate GP posterior at X
+        3. Draw a single sample using Sobol QMC sampler
+        4. Unstandardize outputs using `train_y`
+        5. Apply constraint handling (if any)
+        6. Return NEGATED objectives (since Pymoo minimizes)
+
+    - Stochastic evaluation:
+        Uses a fixed-seed SobolQMCNormalSampler for reproducibility.
+
+    Constraint Handling
+    -------------------
+    - Constraints are assumed to be the last `ncons` outputs.
+    - Feasibility condition: all constraints >= 0
+    - Infeasible points are penalized by assigning a large negative
+      value (-1e12) to their objective values before minimization.
+
+    Important Conventions
+    ---------------------
+    - Pymoo performs minimization → objectives are negated (`out["F"] = -f`)
+    - Model operates in standardized space → outputs are unstandardized
+    - Sampling (not mean) is used → enables exploration of model uncertainty
+
+    Notes
+    -----
+    - Although named "PosteriorMean...", this actually uses posterior samples,
+      not the mean.
+    - Hypervolume is not computed directly here; instead, NSGA-II approximates
+      the Pareto front, which can later be evaluated using HV.
+    - The Sobol sampler ensures deterministic behavior across evaluations
+      when using the same seed.
+
+    """
     tkwargs = {
         "dtype": ref_point.dtype,
         "device": ref_point.device,
@@ -103,8 +198,7 @@ def get_model_identified_hv_maximizing_set(
             #"""
             
             #unstandardizing posterior based on the sent train_y (should be the SAME as the one you use to train your GP)
-            y = unstandardize_ignore_nan(y_std, train_y.to(**tkwargs))
-            #print("y\n",y[:5,:])    
+            y = unstandardize_ignore_nan(y_std, train_y.to(**tkwargs))   
 
             ## Constraint Handling
             if ncons > 0:
@@ -113,15 +207,10 @@ def get_model_identified_hv_maximizing_set(
                 ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
                 y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
                 f = y[..., : problem.nobj]
-                #print("f\n",f[:5,:])
-                
 
-                #out["G"] = -g.cpu().numpy() #2/9 Newline
             else:
                 f=y
-                #print(f.shape)
-
-            #print("evaluate post sample:\n",y)                    
+                
             out["F"] = -f.cpu().numpy()
 
     pymoo_problem = PosteriorMeanPymooProblem()
@@ -141,7 +230,7 @@ def get_model_identified_hv_maximizing_set(
         res.X,
         **tkwargs,
     )
-    X = unnormalize(X, problem.get_bounds())
+    X = unnormalize(X, problem.get_bounds().to(tkwargs["device"]))
     Y = torch.tensor(-res.F, **tkwargs) #problem(X)
     # compute HV
     partitioning = FastNondominatedPartitioning(ref_point=ref_point, Y=Y)
@@ -309,10 +398,54 @@ def corr_and_total_correlation(
     return R, TC
 
 def computeTC(x,mt_model):
+    """
+    Compute the total correlation (TC) from the posterior covariance
+    of a multi-output GP model at a given input.
+
+    This function evaluates the model posterior at a given point,
+    extracts the covariance matrix of the joint output distribution,
+    and computes the total correlation (a measure of statistical
+    dependence between outputs).
+
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input tensor. Can be of shape (..., d) or flat.
+        Internally reshaped to (-1, d_eff), where:
+            - d_eff = dim - 1
+        (assumes last column may correspond to a task index or is excluded)
+
+    mt_model : MultiTaskGP or compatible model
+        A trained multi-output GP model that supports `.posterior(X)`
+        and returns a multivariate normal distribution with a full
+        covariance matrix across outputs.
+
+    Returns
+    -------
+    tc_ : torch.Tensor
+        Scalar tensor representing the total correlation of the
+        posterior output distribution at input `x`.
+
+    Notes
+    -----
+    - The covariance matrix reflects dependencies between outputs
+      (e.g., tasks in a MultiTaskGP).
+    - Total correlation (TC) is a multivariate generalization of mutual
+      information:
+          TC = sum of marginal entropies − joint entropy
+      It is zero if outputs are independent and positive otherwise.
+    - Assumes `corr_and_total_correlation(cov)` returns:
+          (correlation_matrix, total_correlation)
+
+    Assumptions
+    -----------
+    - `mt_model.train_inputs[0]` exists and has shape (..., d_total)
+    - The effective feature dimension is `dim - 1`
+      (e.g., last column may be a task index)
+    - Posterior covariance is fully materialized and small enough
+      to fit in memory
+    """
     dim=mt_model.train_inputs[0].shape[-1]
-    #print("dim",dim)
-    #print("x",x)
-    #print("x viewed",x.view(-1,dim-1))
     post = mt_model.posterior(x.view(-1,dim-1))
     cov  = post.distribution.covariance_matrix  # 2x2 (materialized)
 
@@ -496,13 +629,11 @@ def argmax_mi_subset_bruteforce(
     return out
 
 def fit_mtgp(train_X, train_Y,d,n_train,device,dtype):
-    
+    """
+    Outdated
+    """
     mt_model_kind = "MultiTaskGP(task_feature)"
-    # MultiTaskGP expects a single output (N x 1) and a task feature in X.
-    # We'll stack the observations for the two objectives:
-    #
-    # train_X_mt: (2*n_train, d+1), last column is task index (0 or 1)
-    # train_Y_mt: (2*n_train, 1)
+
     task_feature = d  # last column
     
     train_X0 = torch.cat(
@@ -514,10 +645,6 @@ def fit_mtgp(train_X, train_Y,d,n_train,device,dtype):
     train_X_mt = torch.cat([train_X0, train_X1], dim=0)
     train_Y_mt = torch.cat([train_Y[:, [0]], train_Y[:, [1]]], dim=0)
     
-    # NOTE: Do not Normalize the task column. We'll normalize only the first d dims by pre-normalizing.
-    # Here train_X is already in [0,1]^d, so we skip additional normalization for simplicity.
-    #print("train_X_mt:\n",train_X_mt)
-    #print("train_Y_mt:\n",train_Y_mt)
     mt_model = MultiTaskGP(train_X_mt, train_Y_mt, task_feature=task_feature, outcome_transform=Standardize(m=1), rank=1,
     ).to(device=device, dtype=dtype)
     
@@ -624,9 +751,7 @@ def update_mtgp_with_new_data(
     # 3) concatenate raw training data
     X_upd = torch.cat([X_old_mt, X_new_mt], dim=0)
     Y_upd = torch.cat([Y_old_raw, Y_new_mt], dim=0)
-    #print("train_X_mt:\n",X_upd)
-    #print("train_Y_mt:\n",Y_upd)
-
+    
     # 4) rebuild model so Standardize gets re-fit on (X_upd, Y_upd)
     # Warm-start hypers from the previous model, but drop outcome_transform buffers.
     old_sd = mt_model.state_dict()

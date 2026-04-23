@@ -78,11 +78,8 @@ def mtgp_posterior_mean_hypervolume(gps: ModelObject, ref_point: Tensor = torch.
     task_ids = torch.arange(gps.nobj).repeat_interleave(train_x.shape[0]).unsqueeze(-1)
     train_x_extended = train_x.repeat(gps.nobj, 1)
     train_x_mt = torch.cat([train_x_extended,task_ids], dim=-1)  # (n*num_tasks, d+1)
-    #print("train_x_mt:\n",train_x_mt)
     post = model.posterior(train_x_mt)
     model_y=post.mean.reshape(train_x.shape[0],gps.nobj)
-    #print("model_y.shape:\n",model_y.shape)
-    #print("model_y:\n",model_y)
 
     bd1 = FastNondominatedPartitioning(ref_point.double(), model_y.double())
     hypervolume = bd1.compute_hypervolume()
@@ -311,11 +308,6 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
  
     return selected_candidates, task_ids
 
-############################################################################################################################################
-
-
-
-
 
 #Total Correlation work: 12/31
 def corr_and_total_correlation(
@@ -356,9 +348,7 @@ def corr_and_total_correlation(
     return R, TC
 
 
-# 1/7/26
 ## Mutual Information: ##
-
 def _stable_logdet(A: np.ndarray, jitter: float = 1e-10, max_tries: int = 8) -> float:
     """
     Numerically stable log(det(A)) for (near) PSD matrices by adding diagonal jitter if needed.
@@ -544,7 +534,6 @@ def argmax_mi_subset_bruteforce(
     return out
 
 
-
 def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None
 ) -> Tensor:
     """
@@ -566,7 +555,6 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
 
     model=gps.models[0]
     dim=selected_candidates.shape[1]
-    #print("dim: ",dim)
     num_outputs=gps.nobj+gps.ncons 
     if thresh is None:
         print("Random Task Choice:")
@@ -584,35 +572,6 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
 
     else:
         print("\nTotal Correlation Thresholding Task Choice")
-        #print("Thresh: ",thresh,"\n")
-        #if seed is not None:
-        #    torch.manual_seed(seed)
-
-        
-        #Old TC
-        """
-        tc = [] # total correlation
-        R = [] # R Matrix
-        x_star=torch.tensor(pareto_set)
-        corr_ceoff = []
-        
-        for i in range(q):
-            #Using only the q batch points
-            post = model.posterior(selected_candidates[i].view(-1,2))
-            
-            #Using the whole Pareto Set
-            #post = model.posterior(x_star[i].view(-1,2))
-            with torch.no_grad():
-                cov = post.distribution.covariance_matrix  # 2x2 (materialized)
-            print("Model Covariance: \n", cov)
-           
-            R_, tc_ = corr_and_total_correlation(cov)
-            print("R: \n", R_)
-            print("TC: \n",tc_)
- 
-            tc.append(tc_)
-            R.append(R_)
-        """ 
         
         #Method From Dr. R.
         tc_i = []
@@ -623,74 +582,41 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
                 cov  = post.distribution.covariance_matrix.detach()  # 2x2 (materialized)
 
             _, tc = corr_and_total_correlation(cov)
-            #tc = computeTC(x_new[i])
+  
            
             tc_i.append(torch.abs(tc).item())
             if torch.abs(tc) > thresh:
                 res = argmax_mi_subset_bruteforce(cov, assume_samples=False, base=2.0)
-                #print("res from mi_subset_brute_force: ",res)
+
                 eval_subset=res["S"]
                 if isinstance(eval_subset, int):
                     eval_subset = [eval_subset]
-                #print("eval_subset",eval_subset)
+
                 print("res['S']:", res["S"], type(res["S"]))
                 eval_list.append([
                     i if i in eval_subset else -1
                     for i in range(num_outputs)
                 ])
-                #print("eval_list",eval_list)
+
             else:
-                #print("Full set: ", range(num_outputs))
+
                 eval_list.append(list(range(num_outputs)))
         eval_tensor=torch.tensor(eval_list).double()
             
-        
-        #TC_array = np.array([t.item() for t in tc_i])
         print("All q TC's: \n",tc_i,"\n")
-        
-        #Old Testing of R
-        """
-        TC_tensor=torch.tensor(TC_array)
-        mask = TC_tensor>thresh
-        print("Mask:\n",mask)
-        
-        task_ids = torch.arange(num_outputs).repeat(num_inputs, 1)
-        print("task_ids full:\n",task_ids)
-        
-        Trues_idx = torch.nonzero(mask)
-        print("Indecies that are True:\n", Trues_idx)
-        
-        for idx in Trues_idx:
-            print("Index: ",idx.item())
-            R_current=R[idx.item()]
-            print("R Matrix:\n",R_current)
-            
-            j=0
-            while j<num_outputs:
-                i=0
-                while i<num_outputs:
-                    if i != j:
-                        print(f"R between {i} and {j}: {R_current[i][j]}")
-                    i+=1
-                j+=1
-        """
-        
+
         #Selecting the tasks
         #eval_subset is the MI identifies
       
         tasks_stacked = torch.arange(num_outputs).repeat(selected_candidates.shape[0], 1).double() #was using q instead of selected_candidates.shape[0], but NSGA-II issue
         print("tasks_stacked:\n",tasks_stacked)
         task_ids = torch.full_like(tasks_stacked,float('nan'))
-        #print("task_ids:\n",task_ids)
         print("eval_tensor:\n",eval_tensor)
         mask=tasks_stacked == eval_tensor
-        #print("mask:\n",mask)
         task_ids[mask]=tasks_stacked[mask]
-        #print("task_ids:\n",task_ids)
-        #print("selected_candidates:\n",selected_candidates)
     return selected_candidates, task_ids
 
-###Hypervolume Computation from Dr. R. 1/14
+
 def _augment_X_with_tasks(
     X: torch.Tensor,  # (n, d) WITHOUT the task feature
     num_tasks: int,
@@ -760,13 +686,10 @@ def hypervolume_from_posterior_mean_mtgp(
     # Build long-format inputs and get posterior mean for each (x, task)
     X_aug = _augment_X_with_tasks(X, num_tasks=K, task_feature=task_feature)  # (n*K, d+1)
     post = mt_model.posterior(X_aug)
-    #print("mean: ",post.mean)
     mean_flat = post.mean.squeeze(-1)  # (n*K,)
-    #print("mean_flat: ",mean_flat)
 
     n = X.shape[0]
     Y_mean = mean_flat.view(K, n).transpose(0, 1).contiguous()  # (n, K)
-    #print("Y_mean: ",Y_mean)
 
     # Hypervolume assumes maximization. If minimizing, negate both.
     if not maximize:
@@ -808,12 +731,9 @@ def compute_true_hypervolume(
     if ncons > 0:
         is_feas = (Y[..., -ncons:] >= 0).all(dim=-1)
         Y = Y[is_feas]
-        #print("is_feas",is_feas)
-        #print("Y feas",Y)
 
     #Taking only the objectives
     Y=Y[...,:nobj]
-    #print("Y feas obj",Y)
 
     # Infer K (#objectives/tasks) from ref_point
     if not torch.is_tensor(ref_point):
@@ -834,22 +754,6 @@ def compute_true_hypervolume(
 
     hv = Hypervolume(ref_point=ref_point).compute(pareto_Y)
     return hv
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-############################################################################################################################################
 
 def minmax_scale(x, dim=None,eps=1e-12):
     """
@@ -898,8 +802,6 @@ def posterior_mean_fill(gps: ModelObject):
             X_missing = gps.train_x[missing_mask]
             task_idx = torch.full((X_missing.shape[0], 1), m, dtype=torch.long, device=gps.train_x.device)
             posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
-            
-            #full_train_y[missing_mask, m] = unstandardize_ignore_nan(posterior.mean,gps.train_y)[:, m]
             full_train_y[missing_mask, m] = posterior.mean[:, m]
             
     return full_train_y
