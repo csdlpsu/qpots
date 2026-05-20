@@ -14,20 +14,20 @@
   <img alt="Python versions" src="https://img.shields.io/badge/python-%3E%3D3.10-blue">
 </p>
 
-qPOTS is a Python package for sample-efficient multiobjective Bayesian optimization. It implements **Pareto Optimal Thompson Sampling**, a batch acquisition strategy that selects candidates according to their probability of being Pareto optimal under Gaussian-process posterior samples.
+$q\texttt{POTS}$ is a Python package for sample-efficient multiobjective Bayesian optimization. It implements **Pareto Optimal Thompson Sampling**, a batch acquisition strategy that selects candidates according to their probability of being Pareto optimal under Gaussian-process posterior samples.
 
 The project is maintained by the Computational Complex Engineered Systems Design Laboratory ([CSDL](https://sites.psu.edu/csdl/)) at Penn State.
 
-## Why qPOTS?
+## Why $q\texttt{POTS}$?
 
-Multiobjective optimization often requires many expensive function evaluations before a useful Pareto front emerges. qPOTS combines Gaussian-process surrogate modeling with evolutionary optimization over posterior samples, giving users a practical way to propose informative batches without directly optimizing a difficult analytical acquisition function.
+Multiobjective optimization often requires many expensive function evaluations before a useful Pareto front emerges. $q\texttt{POTS}$ combines Gaussian-process surrogate modeling with evolutionary optimization over posterior samples, giving users a practical way to propose informative batches without directly optimizing a difficult analytical acquisition function.
 
-Use qPOTS when you need to:
+Use $q\texttt{POTS}$ when you need to:
 
 - optimize two or more competing objectives with limited evaluation budget;
 - propose one or more candidates per Bayesian optimization iteration;
 - handle BoTorch benchmark functions or your own custom objectives;
-- compare qPOTS against common multiobjective acquisition strategies; or
+- compare $q\texttt{POTS}$ against common multiobjective acquisition strategies; or
 - run TS-EMO baselines when MATLAB Engine is available.
 
 ## Installation
@@ -46,11 +46,11 @@ cd qpots
 pip install .
 ```
 
-qPOTS requires Python 3.10 or newer. The core qPOTS implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, and pymoo.
+$q\texttt{POTS}$ requires Python 3.10 or newer. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, and pymoo.
 
 ### Optional MATLAB Engine
 
-The MATLAB Engine is only needed if you plan to use the TS-EMO baseline included with this repository. qPOTS itself and the BoTorch-based acquisition functions do not require MATLAB.
+The MATLAB Engine is only needed if you plan to use the TS-EMO baseline included with this repository. $q\texttt{POTS}$ itself and the BoTorch-based acquisition functions do not require MATLAB.
 
 Install MATLAB Engine with the version that matches your local MATLAB installation. For example, MATLAB R2023b uses:
 
@@ -62,7 +62,7 @@ See MathWorks' [MATLAB Engine for Python installation guide](https://www.mathwor
 
 ## Quick Start
 
-The example below runs qPOTS on the two-objective Branin-Currin benchmark.
+The example below runs $q\texttt{POTS}$ on the two-objective Branin-Currin benchmark.
 
 ```python
 import time
@@ -164,7 +164,7 @@ The hosted documentation includes installation notes, API references, and worked
 
 The main reference for this repository is the AISTATS 2025 paper:
 
-> Ashwin Renganathan and Kade Carlson. qPOTS: Efficient Batch Multiobjective Bayesian Optimization via Pareto Optimal Thompson Sampling. Proceedings of The 28th International Conference on Artificial Intelligence and Statistics, PMLR 258:4051-4059, 2025.
+> Ashwin Renganathan and Kade Carlson. $q\texttt{POTS}$: Efficient Batch Multiobjective Bayesian Optimization via Pareto Optimal Thompson Sampling. Proceedings of The 28th International Conference on Artificial Intelligence and Statistics, PMLR 258:4051-4059, 2025.
 
 ```bibtex
 @inproceedings{renganathan2025qpots,
