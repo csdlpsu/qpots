@@ -3,6 +3,7 @@
 import torch
 import numpy as np
 from botorch.test_functions import BraninCurrin
+from qpots.config import as_tensor
 
 def BC_evaluate(x):
     """
@@ -20,13 +21,13 @@ def BC_evaluate(x):
         True Branin-Currin objective values evaluated at ``x``.
     """
     # Convert numpy array input to a PyTorch tensor
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
     
     # Instantiate BraninCurrin problem
-    problem = BraninCurrin()
+    problem = BraninCurrin().to(device=X.device, dtype=X.dtype)
     
     # Evaluate the problem with the given inputs
     result = problem.evaluate_true(X)
     
     # Convert the result back to a numpy array and return
-    return result.numpy()
+    return result.detach().cpu().numpy()

@@ -8,6 +8,7 @@ from botorch.test_functions.synthetic import Branin
 from torch import Tensor
 from typing import Callable, Optional
 import torch
+from qpots.config import get_device, get_dtype, to_runtime
 
 
 class Function:
@@ -27,6 +28,8 @@ class Function:
         custom_func: Optional[Callable[[Tensor], Tensor]] = None,
         bounds: Optional[Tensor] = None,
         cons: Optional[Callable[[Tensor], Tensor]] = None,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
     ):
         """
         Initialize a test function for multi-objective optimization.
@@ -48,6 +51,12 @@ class Function:
             Required if using a custom function.
         cons : Callable, optional
             A constraint function that maps inputs to constraint values.
+        device : torch.device or str, optional
+            Device used for generated bounds and evaluations. Defaults to the
+            qPOTS runtime device.
+        dtype : torch.dtype, optional
+            Floating-point precision used for generated bounds and evaluations.
+            Defaults to ``qpots.config.DEFAULT_DTYPE``.
 
         Raises
         ------
@@ -58,8 +67,10 @@ class Function:
         self.name = name.lower() if name else None
         self.dim = dim
         self.nobj = nobj
+        self.device = get_device(device)
+        self.dtype = get_dtype(dtype)
         self.custom_func = custom_func
-        self.bounds = bounds
+        self.bounds = to_runtime(bounds, self.device, self.dtype) if torch.is_tensor(bounds) else bounds
         self.cons = cons
 
         if self.custom_func:
@@ -119,9 +130,23 @@ class Function:
 
         # Initialize function, bounds, and constraints
         self.func = func_map[self.name]()
-        self.bounds = self.func.bounds.double()
+        if hasattr(self.func, "to"):
+            self.func = self.func.to(device=self.device, dtype=self.dtype)
+        self.bounds = self.func.bounds.to(device=self.device, dtype=self.dtype)
         if hasattr(self.func, "evaluate_slack"):
-            self.cons = self.func.evaluate_slack
+            self.cons = self._evaluate_constraints
+
+    def _evaluate_constraints(self, X: Tensor) -> Tensor:
+        """Evaluate BoTorch constraint slack values on the runtime device/dtype."""
+        X = X.to(device=self.device, dtype=self.dtype)
+        try:
+            result = self.func.evaluate_slack(X)
+        except ValueError as err:
+            if "within the bounds" not in str(err) or not torch.is_tensor(self.bounds):
+                raise
+            X_eval = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
+            result = self.func.evaluate_slack(X_eval)
+        return result.to(device=self.device, dtype=self.dtype)
 
     def evaluate(self, X: Tensor) -> Tensor:
         """
@@ -137,9 +162,20 @@ class Function:
         Tensor
             A tensor of shape `(n, nobj)` containing the function outputs.
         """
+        X = X.to(device=self.device, dtype=self.dtype)
         if self.custom_func:
-            return self.custom_func(X)
-        return self.func(X)
+            return self.custom_func(X).to(device=self.device, dtype=self.dtype)
+        try:
+            result = self.func(X)
+        except ValueError as err:
+            if "within the bounds" not in str(err) or not hasattr(self.func, "evaluate_true"):
+                raise
+            if torch.is_tensor(self.bounds):
+                X_eval = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
+                result = self.func(X_eval)
+            else:
+                raise
+        return result.to(device=self.device, dtype=self.dtype)
 
     def get_bounds(self) -> Tensor:
         """

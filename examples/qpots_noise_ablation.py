@@ -39,6 +39,7 @@ import warnings
 # qPOTS imports
 from botorch.utils.transforms import unnormalize
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.function import Function
 from qpots.utils.utils import expected_hypervolume
@@ -47,11 +48,13 @@ warnings.filterwarnings("ignore")
 
 # -------------------------- Utilities --------------------------
 
-def set_torch(device: str = "cpu", seed: int = 0):
+def set_torch(device: str = "auto", seed: int = 0):
     torch.manual_seed(seed)
     if device == "cuda" and torch.cuda.is_available():
         return torch.device("cuda")
-    return torch.device("cpu")
+    if device == "cpu":
+        return torch.device("cpu")
+    return DEFAULT_DEVICE
 
 
 def auto_ref_point(func: Function, bounds: torch.Tensor, dim: int, nobj: int,
@@ -63,17 +66,17 @@ def auto_ref_point(func: Function, bounds: torch.Tensor, dim: int, nobj: int,
     For minimization HV, it should be componentwise larger.
     """
     g = torch.Generator().manual_seed(seed)
-    X = torch.rand((n_samples, dim), dtype=torch.float64, generator=g)
+    X = torch.rand((n_samples, dim), dtype=DEFAULT_DTYPE, generator=g)
     Y = func.evaluate(unnormalize(X, bounds))  # (n_samples, nobj)
     y_min = Y.min(dim=0).values
     y_max = Y.max(dim=0).values
     margin = 0.05 * (y_max - y_min).clamp_min(1e-12)
     if not minimize:
         # Maximization: set ref below the worst observed with a bit of slack
-        ref = (y_min - margin).to(dtype=torch.float64)
+        ref = (y_min - margin).to(dtype=DEFAULT_DTYPE)
     else:
         # Minimization: set ref above the worst observed with a bit of slack
-        ref = (y_max + margin).to(dtype=torch.float64)
+        ref = (y_max + margin).to(dtype=DEFAULT_DTYPE)
     return ref
 
 
@@ -110,7 +113,7 @@ def run_single_rep(rep: int,
     g = torch.Generator().manual_seed(base_seed)
 
     # Initial random design in [0,1]^d, then unnormalize to real bounds
-    train_x = torch.rand([args.ntrain, dim], dtype=torch.float64, generator=g)
+    train_x = torch.rand([args.ntrain, dim], dtype=DEFAULT_DTYPE, generator=g)
     true_y = tf.evaluate(unnormalize(train_x, bounds))
     train_y = add_gaussian_noise(true_y, noise_var, g)
 
@@ -257,7 +260,7 @@ def main():
     # Build a reference point automatically based on random sampling
     ref_point = auto_ref_point(tf, bounds, args.dim, args.nobj,
                                n_samples=4096, minimize=args.minimize, seed=args.seed)
-    print(f"Ref point (computed): {ref_point.numpy()}  (minimize={args.minimize})")
+    print(f"Ref point (computed): {ref_point.detach().cpu().numpy()}  (minimize={args.minimize})")
 
     all_runs = []
     for nv in args.noise_vars:

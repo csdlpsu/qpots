@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from botorch.test_functions.multi_objective import DH1
+from qpots.config import as_tensor
 
 
 def dh1_eval(x, dim):
@@ -19,10 +20,10 @@ def dh1_eval(x, dim):
     numpy.ndarray
         True DH1 objective values.
     """
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
 
-    problem = DH1(int(dim))
+    problem = DH1(int(dim)).to(device=X.device, dtype=X.dtype)
 
     result = problem.evaluate_true(X)
 
-    return result.numpy()
+    return result.detach().cpu().numpy()

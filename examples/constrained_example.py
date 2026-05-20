@@ -10,6 +10,8 @@ import numpy as np
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill
@@ -34,7 +36,7 @@ elif test_function_tag =="weldedbeam":
     ref_pass=[40, 10]
     var_pass=[-0.5,-0.5]
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
         {
             "ntrain": ntrain_pass,
@@ -42,7 +44,7 @@ args = dict(
             "reps": 20,
             "q": 2,
             "wd": "..",
-            "ref_point": -1*torch.tensor(ref_pass),
+            "ref_point": -1*torch.tensor(ref_pass, device=device, dtype=DEFAULT_DTYPE),
             "dim": dim_pass,
             "nobj": nobj_pass,
             "ncons": ncons_pass,
@@ -63,7 +65,7 @@ cons = tf.get_cons()
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023) #1023
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))]) # Stack constraints on top of objectives
 full_y=train_y
@@ -157,5 +159,4 @@ for i in range(args["iters"]):
 if args["partial_info"]==1:
     train_y_filled=posterior_mean_fill(gps)
     np.save(f"{args['wd']}/cons_"+tag+"_train_y_filled.npy", train_y_filled.detach().cpu().numpy())
-
 

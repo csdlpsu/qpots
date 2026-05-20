@@ -81,6 +81,7 @@ else:
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill, mtgp_posterior_mean_hypervolume
@@ -94,8 +95,8 @@ from qpots.utils.utils import hypervolume_from_posterior_mean_mtgp
 from botorch.test_functions.multi_objective import BraninCurrin
 
 
-dtype = torch.double
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dtype = DEFAULT_DTYPE
+device = DEFAULT_DEVICE
 print("device:", device)
 #Added mt as multi-task to args, 0 is false 1 is true
 args = dict(
@@ -138,7 +139,7 @@ for REP in range(REPS):
         # set up the training points
         torch.manual_seed(manual_seed+REP)
 
-        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=DEFAULT_DTYPE)
         train_Y = f(unnormalize(train_X, bounds))
 
 
@@ -168,7 +169,7 @@ for REP in range(REPS):
             x_new = qmaximin(train_X_full, torch.tensor(res.X), q=args["q"])
             
 
-            y_new = torch.full([args["q"], args["nobj"]], torch.nan, dtype=torch.double) #torch.zeros(q, problem.num_objectives)
+            y_new = torch.full([args["q"], args["nobj"]], torch.nan, dtype=DEFAULT_DTYPE) #torch.zeros(q, problem.num_objectives)
             
             tc_i = []
             for i in range(args["q"]):

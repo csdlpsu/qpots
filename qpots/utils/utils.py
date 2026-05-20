@@ -10,6 +10,7 @@ import argparse
 from typing import Tuple
 from qpots.model_object import ModelObject
 from qpots.utils.tc_utils import qmaximin 
+from qpots.config import as_tensor, get_device, get_dtype
 import numpy as np
 
 from itertools import combinations
@@ -54,11 +55,11 @@ def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) ->
         The unstandardized output tensor.
     """
     mean = torch.nanmean(train_y, dim=0)
-    std = torch.from_numpy(np.nanstd(train_y.cpu().numpy(), axis=0, ddof=1)).to(train_y)
+    std = torch.from_numpy(np.nanstd(train_y.detach().cpu().numpy(), axis=0, ddof=1)).to(train_y)
     return Y * std + mean
 
 #1/9/26
-def mtgp_posterior_mean_hypervolume(gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0])):
+def mtgp_posterior_mean_hypervolume(gps: ModelObject, ref_point: Tensor | None = None):
     """
         Compute the expected hypervolume based ONLY on MTGP model predictions.
 
@@ -74,19 +75,20 @@ def mtgp_posterior_mean_hypervolume(gps: ModelObject, ref_point: Tensor = torch.
         """
     model=gps.models[0]
     train_x=gps.train_x
+    ref_point = as_tensor([-300.0, -18.0], device=train_x.device, dtype=train_x.dtype) if ref_point is None else ref_point.to(train_x)
     
-    task_ids = torch.arange(gps.nobj).repeat_interleave(train_x.shape[0]).unsqueeze(-1)
+    task_ids = torch.arange(gps.nobj, device=train_x.device, dtype=train_x.dtype).repeat_interleave(train_x.shape[0]).unsqueeze(-1)
     train_x_extended = train_x.repeat(gps.nobj, 1)
     train_x_mt = torch.cat([train_x_extended,task_ids], dim=-1)  # (n*num_tasks, d+1)
     post = model.posterior(train_x_mt)
     model_y=post.mean.reshape(train_x.shape[0],gps.nobj)
 
-    bd1 = FastNondominatedPartitioning(ref_point.double(), model_y.double())
+    bd1 = FastNondominatedPartitioning(ref_point, model_y)
     hypervolume = bd1.compute_hypervolume()
     return hypervolume
 
 def expected_hypervolume(
-    gps: ModelObject, ref_point: Tensor = torch.tensor([-300.0, -18.0]), min: bool = False
+    gps: ModelObject, ref_point: Tensor | None = None, min: bool = False
 ) -> Tuple[float, Tensor]:
     """
     Compute the expected hypervolume and Pareto front based on GP model predictions.
@@ -107,6 +109,14 @@ def expected_hypervolume(
         - pareto_front (torch.Tensor): The Pareto front tensor.
     """
     train_y_filled=posterior_mean_fill(gps)
+    runtime_dtype = get_dtype(getattr(gps, "dtype", None))
+    runtime_device = train_y_filled.device
+    train_y_filled = train_y_filled.to(device=runtime_device, dtype=runtime_dtype)
+    ref_point = as_tensor(
+        [-300.0, -18.0],
+        device=runtime_device,
+        dtype=runtime_dtype,
+    ) if ref_point is None else torch.as_tensor(ref_point, device=runtime_device, dtype=runtime_dtype)
     
     nan_mask = ~torch.isnan(train_y_filled[..., :gps.nobj]).any(dim=1)
     
@@ -116,13 +126,13 @@ def expected_hypervolume(
             is_feas_obj = gps.train_y[is_feas]
             pareto_mask = is_non_dominated(is_feas_obj, maximize=False)
             pareto_front = is_feas_obj[pareto_mask]
-            hv_calculator = Hypervolume(ref_point=-1 * torch.tensor([0.335, 0.335]))
+            hv_calculator = Hypervolume(ref_point=-1 * as_tensor([0.335, 0.335], device=gps.train_y.device, dtype=gps.train_y.dtype))
             hypervolume_value = hv_calculator.compute(-1 * pareto_front)
             return hypervolume_value, pareto_front
         else:
             pareto_mask = is_non_dominated(gps.train_y, maximize=False)
             pareto_front = gps.train_y[pareto_mask]
-            hv_calculator = Hypervolume(ref_point=-1 * torch.tensor([0.335, 0.335]))
+            hv_calculator = Hypervolume(ref_point=-1 * as_tensor([0.335, 0.335], device=gps.train_y.device, dtype=gps.train_y.dtype))
             hypervolume_value = hv_calculator.compute(-1 * pareto_front)
             return hypervolume_value, pareto_front
     else:
@@ -131,16 +141,16 @@ def expected_hypervolume(
             valid_mask = is_feas & nan_mask
             Y_valid = train_y_filled[valid_mask]
 
-            bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid[..., :gps.nobj].double())
+            bd1 = FastNondominatedPartitioning(ref_point, Y_valid[..., :gps.nobj])
             return bd1.compute_hypervolume(), bd1.pareto_Y
         else:
             Y_valid = train_y_filled[nan_mask, :gps.nobj]
             
-            bd1 = FastNondominatedPartitioning(ref_point.double(), Y_valid.double())
+            bd1 = FastNondominatedPartitioning(ref_point, Y_valid)
             return bd1.compute_hypervolume(), bd1.pareto_Y
 
 def gen_filtered_cands(
-    gps: ModelObject, cands: Tensor, ref_point: Tensor = torch.tensor([0.0, 0.0]), kernel_bandwidth: float = 0.05
+    gps: ModelObject, cands: Tensor, ref_point: Tensor | None = None, kernel_bandwidth: float = 0.05
 ) -> Tensor:
     """
     Generate filtered candidate points based on the current Pareto front using Kernel Density Estimation (KDE).
@@ -161,21 +171,23 @@ def gen_filtered_cands(
     torch.Tensor
         Filtered candidate points.
     """
-    bd1 = FastNondominatedPartitioning(ref_point.double(), gps.train_y)
+    cands = cands.to(gps.train_x)
+    ref_point = as_tensor([0.0, 0.0], device=gps.train_y.device, dtype=gps.train_y.dtype) if ref_point is None else ref_point.to(gps.train_y)
+    bd1 = FastNondominatedPartitioning(ref_point, gps.train_y)
     nPareto = bd1.pareto_Y.shape[0]
 
     # Find Pareto-optimal indices
-    ind = torch.tensor([(gps.train_y == bd1.pareto_Y[j]).nonzero()[0, 0] for j in range(nPareto)])
+    ind = torch.tensor([(gps.train_y == bd1.pareto_Y[j]).nonzero()[0, 0] for j in range(nPareto)], device=gps.train_x.device)
     x_nd = gps.train_x[ind]
 
     # Fit KDE to Pareto points
-    kde = KernelDensity(kernel="gaussian", bandwidth=kernel_bandwidth).fit(x_nd)
+    kde = KernelDensity(kernel="gaussian", bandwidth=kernel_bandwidth).fit(x_nd.detach().cpu().numpy())
 
     # Filter candidates using KDE sampling
-    U = torch.log(torch.rand(cands.shape[0]))
-    w = kde.score_samples(cands)
+    U = torch.log(torch.rand(cands.shape[0], device=cands.device, dtype=cands.dtype))
+    w = kde.score_samples(cands.detach().cpu().numpy())
     M = w.max()
-    cands_fil = cands[w > U.numpy() * M]
+    cands_fil = cands[w > U.detach().cpu().numpy() * M]
 
     return cands_fil
 
@@ -206,9 +218,12 @@ def select_candidates(
     if seed is not None:
         torch.manual_seed(seed)
     print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
-    D = cdist(pareto_set, gps.train_x.numpy())
+    device = get_device(device)
+    dtype_attr = getattr(gps, "dtype", None)
+    dtype = dtype_attr if isinstance(dtype_attr, torch.dtype) else gps.train_x.dtype
+    D = cdist(pareto_set, gps.train_x.detach().cpu().numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
-    selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
+    selected_candidates = torch.as_tensor(pareto_set[selected_indices], device=device, dtype=dtype)
     return selected_candidates
 
 def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None, rescaling: str = "_"
@@ -249,9 +264,12 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         - `task_ids`: Tensor of shape `[num_selected, num_tasks]` indicating which tasks are selected for each candidate.
     """
     print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
-    D = cdist(pareto_set, gps.train_x.numpy())
+    device = get_device(device)
+    dtype_attr = getattr(gps, "dtype", None)
+    dtype = dtype_attr if isinstance(dtype_attr, torch.dtype) else gps.train_x.dtype
+    D = cdist(pareto_set, gps.train_x.detach().cpu().numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
-    selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
+    selected_candidates = torch.as_tensor(pareto_set[selected_indices], device=device, dtype=dtype)
     
     if pareto_set.shape[0]<=q:
         print(f"WARNING Pareto Set from NSGA-II is smaller than number of batch points: {pareto_set.shape[0]}")
@@ -263,11 +281,11 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
     if thresh is None:
         print("Random Task Choice:")
     
-        task_ids = torch.full((num_inputs, num_outputs), float("nan")).double()
-        tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
+        task_ids = torch.full((num_inputs, num_outputs), float("nan"), device=device, dtype=dtype)
+        tasks_stacked = torch.arange(num_outputs, device=device, dtype=dtype).repeat(num_inputs, 1)
 
-        mask = torch.randint(0, 2, (num_inputs, num_outputs)).bool()
-        task_ids[mask] = tasks_stacked[mask].double()
+        mask = torch.randint(0, 2, (num_inputs, num_outputs), device=device).bool()
+        task_ids[mask] = tasks_stacked[mask]
 
         # remove rows that are all NaN
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
@@ -279,11 +297,11 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         if seed is not None:
             torch.manual_seed(seed)
 
-        task_ids=torch.arange(end=num_outputs).repeat_interleave(num_inputs).reshape(-1,1)
-        new_x_mt=torch.cat([selected_candidates.repeat(num_outputs,1),task_ids],dim=-1).double()
-        rand_y_mt=torch.rand(num_inputs,num_outputs).double().T.reshape(-1, 1).double() 
+        task_ids=torch.arange(end=num_outputs, device=device, dtype=dtype).repeat_interleave(num_inputs).reshape(-1,1)
+        new_x_mt=torch.cat([selected_candidates.repeat(num_outputs,1),task_ids],dim=-1)
+        rand_y_mt=torch.rand(num_inputs,num_outputs, device=device, dtype=dtype).T.reshape(-1, 1)
     
-        new_model = model.condition_on_observations(X=new_x_mt.double(), Y=rand_y_mt.double()) #Fantasizing
+        new_model = model.condition_on_observations(X=new_x_mt, Y=rand_y_mt) #Fantasizing
         new_variance = new_model.posterior(selected_candidates).variance
         
         task_ids = torch.full_like(new_variance,float('nan'))
@@ -299,7 +317,7 @@ def select_candidates_partial_info(gps: ModelObject, pareto_set: np.ndarray, dev
         else:
             mask = new_variance>thresh.unsqueeze(0)
         
-        tasks_stacked = torch.arange(num_outputs).repeat(num_inputs, 1).double()
+        tasks_stacked = torch.arange(num_outputs, device=device, dtype=dtype).repeat(num_inputs, 1)
         task_ids[mask]=tasks_stacked[mask]
         # Removing any empty rows
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
@@ -586,9 +604,12 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
     #Old Maxmin distance
     #"""
     print("Sample Pareto Set, X*, is of shape: ",pareto_set.shape)
-    D = cdist(pareto_set, gps.train_x.numpy())
+    device = get_device(device)
+    dtype_attr = getattr(gps, "dtype", None)
+    dtype = dtype_attr if isinstance(dtype_attr, torch.dtype) else gps.train_x.dtype
+    D = cdist(pareto_set, gps.train_x.detach().cpu().numpy())
     selected_indices = D.min(axis=-1).argsort()[-q:]
-    selected_candidates = torch.from_numpy(pareto_set[selected_indices]).to(torch.double).to(device)
+    selected_candidates = torch.as_tensor(pareto_set[selected_indices], device=device, dtype=dtype)
     #"""
     #New Maxmin distance, 1/15, in tc_utils.py: 
     #selected_candidates = qmaximin(gps.train_x, torch.tensor(pareto_set), q=q)
@@ -603,11 +624,11 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
     if thresh is None:
         print("Random Task Choice:")
     
-        task_ids = torch.full((q, num_outputs), float("nan")).double()
-        tasks_stacked = torch.arange(num_outputs).repeat(q, 1).double()
+        task_ids = torch.full((q, num_outputs), float("nan"), device=device, dtype=dtype)
+        tasks_stacked = torch.arange(num_outputs, device=device, dtype=dtype).repeat(q, 1)
 
-        mask = torch.randint(0, 2, (q, num_outputs)).bool()
-        task_ids[mask] = tasks_stacked[mask].double()
+        mask = torch.randint(0, 2, (q, num_outputs), device=device).bool()
+        task_ids[mask] = tasks_stacked[mask]
 
         # remove rows that are all NaN
         nan_mask = ~torch.isnan(task_ids).all(dim=1)
@@ -645,14 +666,14 @@ def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray
             else:
 
                 eval_list.append(list(range(num_outputs)))
-        eval_tensor=torch.tensor(eval_list).double()
+        eval_tensor=torch.as_tensor(eval_list, device=device, dtype=dtype)
             
         print("All q TC's: \n",tc_i,"\n")
 
         #Selecting the tasks
         #eval_subset is the MI identifies
       
-        tasks_stacked = torch.arange(num_outputs).repeat(selected_candidates.shape[0], 1).double() #was using q instead of selected_candidates.shape[0], but NSGA-II issue
+        tasks_stacked = torch.arange(num_outputs, device=device, dtype=dtype).repeat(selected_candidates.shape[0], 1) #was using q instead of selected_candidates.shape[0], but NSGA-II issue
         print("tasks_stacked:\n",tasks_stacked)
         task_ids = torch.full_like(tasks_stacked,float('nan'))
         print("eval_tensor:\n",eval_tensor)
@@ -737,15 +758,11 @@ def hypervolume_from_posterior_mean_mtgp(
     """
     mt_model.eval()
 
-    # Infer K (#objectives/tasks) from ref_point
-    if not torch.is_tensor(ref_point):
-        ref_point = torch.tensor(ref_point)
-
     # Move to model device/dtype
     p = next(mt_model.parameters())
     device, dtype = p.device, p.dtype
     X = X.to(device=device, dtype=dtype)
-    ref_point = ref_point.to(device=device, dtype=dtype).view(-1)
+    ref_point = torch.as_tensor(ref_point, device=device, dtype=dtype).view(-1)
     K = ref_point.numel()
 
     # Build long-format inputs and get posterior mean for each (x, task)
@@ -800,9 +817,7 @@ def compute_true_hypervolume(
     #Taking only the objectives
     Y=Y[...,:nobj]
 
-    # Infer K (#objectives/tasks) from ref_point
-    if not torch.is_tensor(ref_point):
-        ref_point = torch.tensor(ref_point)
+    ref_point = torch.as_tensor(ref_point, device=Y.device, dtype=Y.dtype)
 
     # Hypervolume assumes maximization. If minimizing, negate both.
     if not maximize:
@@ -815,7 +830,7 @@ def compute_true_hypervolume(
 
     if pareto_Y.numel() == 0:
         # Shouldn't happen unless n=0, but keep it safe:
-        return torch.zeros(())
+        return torch.zeros((), device=Y.device, dtype=Y.dtype)
 
     hv = Hypervolume(ref_point=ref_point).compute(pareto_Y)
     return hv

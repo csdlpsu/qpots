@@ -9,14 +9,16 @@ import numpy as np
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.utils.utils import expected_hypervolume
 from qpots.function import Function
 
 import torch
 from botorch.utils.transforms import unnormalize
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
         {
             "ntrain": 20,
@@ -24,7 +26,7 @@ args = dict(
             "reps": 20,
             "q": 1,
             "wd": ".",
-            "ref_point": torch.tensor([-300, -18]),
+            "ref_point": torch.tensor([-300, -18], device=device, dtype=DEFAULT_DTYPE),
             "dim": 2,
             "nobj": 2,
             "ncons": 0,
@@ -41,7 +43,7 @@ bounds = tf.get_bounds()
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 
 gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
@@ -68,17 +70,17 @@ for i in range(args["iters"]):
     gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
     gps.fit_gp()
 
-    np.save(f"{args["wd"]}/train_x.npy", train_x)
-    np.save(f"{args["wd"]}/train_y.npy", train_y)
-    np.save(f"{args["wd"]}/hv.npy", hvs)
-    np.save(f"{args["wd"]}/times.npy", times)
+    np.save(f"{args['wd']}/train_x.npy", train_x.detach().cpu().numpy())
+    np.save(f"{args['wd']}/train_y.npy", train_y.detach().cpu().numpy())
+    np.save(f"{args['wd']}/hv.npy", hvs)
+    np.save(f"{args['wd']}/times.npy", times)
 
 """
 To use another acquisition function in the same script, the process must be repeated
 starting at train_x. It is recommended to use the same seed for initialization
 """
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 
 gps_par = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
@@ -105,7 +107,7 @@ for j in range(args["iters"]):
     gps_par = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
     gps_par.fit_gp()
 
-    np.save(f"{args["wd"]}/train_x.npy", train_x)
-    np.save(f"{args["wd"]}/train_y.npy", train_y)
-    np.save(f"{args["wd"]}/hv.npy", hvs)
+    np.save(f"{args['wd']}/train_x.npy", train_x.detach().cpu().numpy())
+    np.save(f"{args['wd']}/train_y.npy", train_y.detach().cpu().numpy())
+    np.save(f"{args['wd']}/hv.npy", hvs)
     np.save(f"{args["wd"]}/times.npy", times)

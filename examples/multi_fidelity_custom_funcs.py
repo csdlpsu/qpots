@@ -13,13 +13,14 @@ import torch
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume, full_hypervolume
 from qpots.utils.utils import posterior_mean_fill
 from qpots.function import Function
 from botorch.utils.transforms import unnormalize
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 test_function_tag="DTLZ2"
 print(test_function_tag)
 if test_function_tag =="mfcurrin":
@@ -78,7 +79,7 @@ manual_seed=1023
 torch.manual_seed(manual_seed)#OLD: 1023, NEW: 2046 (better pareto front)
 
 # set up the training points
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 full_y=train_y
 

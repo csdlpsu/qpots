@@ -194,15 +194,11 @@ def hypervolume_from_posterior_mean_gp(
     """
     model.eval()
 
-    # Infer K (#objectives/tasks) from ref_point
-    if not torch.is_tensor(ref_point):
-        ref_point = torch.tensor(ref_point)
-
     # Move to model device/dtype
     p = next(model.parameters())
     device, dtype = p.device, p.dtype
     X = X.to(device=device, dtype=dtype)
-    ref_point = ref_point.to(device=device, dtype=dtype).view(-1)
+    ref_point = torch.as_tensor(ref_point, device=device, dtype=dtype).view(-1)
     K = ref_point.numel()
 
     # Build long-format inputs and get posterior mean for each (x, task)
@@ -797,4 +793,3 @@ class qDecoupledPESMO(_CompetitiveDecouplingMixin, qMultiObjectivePredictiveEntr
         """
         return self._compute_information_gain(X)
     
-

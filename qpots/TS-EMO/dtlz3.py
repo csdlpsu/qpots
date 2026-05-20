@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from botorch.test_functions.multi_objective import DTLZ3
+from qpots.config import as_tensor
 
 
 def dtlz3(x, dim):
@@ -20,10 +21,10 @@ def dtlz3(x, dim):
         Negated DTLZ3 objective values. The negation keeps the benchmark
         aligned with the maximization convention used elsewhere in qPOTS.
     """
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
 
-    problem = DTLZ3(int(dim), num_objectives=6)
+    problem = DTLZ3(int(dim), num_objectives=6).to(device=X.device, dtype=X.dtype)
 
     result = problem.evaluate_true(X)
     # DTLZ3 negate=True doesn't work, negate here for results
-    return -1*result.numpy()
+    return -1 * result.detach().cpu().numpy()

@@ -16,6 +16,7 @@ qPOTS Documentation
    :caption: API Reference
 
    qpots_acquisition
+   qpots_config
    qpots_function
    qpots_model_object
    qpots_ts_emo_wrappers

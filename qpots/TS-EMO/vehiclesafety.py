@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from botorch.test_functions.multi_objective import VehicleSafety
+from qpots.config import as_tensor
 
 def vehiclesafety(x):
     """
@@ -16,7 +17,7 @@ def vehiclesafety(x):
     numpy.ndarray
         Objective values from ``VehicleSafety.evaluate_true``.
     """
-    X = torch.tensor(x, dtype=torch.float32)
-    problem = VehicleSafety()
+    X = as_tensor(x)
+    problem = VehicleSafety().to(device=X.device, dtype=X.dtype)
     result = problem.evaluate_true(X)
-    return result.numpy()
+    return result.detach().cpu().numpy()

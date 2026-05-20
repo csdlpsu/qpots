@@ -104,6 +104,7 @@ else:
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.utils.utils import posterior_mean_fill, mtgp_posterior_mean_hypervolume
@@ -121,11 +122,11 @@ from botorch.test_functions.multi_objective import (
 )
 
 
-dtype = torch.double
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dtype = DEFAULT_DTYPE
+device = DEFAULT_DEVICE
 tkwargs = {
-    "dtype": torch.double,
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "dtype": DEFAULT_DTYPE,
+    "device": DEFAULT_DEVICE,
 }
 print("device:", device,flush=True)
 #Added mt as multi-task to args, 0 is false 1 is true
@@ -208,7 +209,7 @@ for REP in range(REPS):
         # set up the training points
         torch.manual_seed(manual_seed+REP)
 
-        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double, device=device)
+        train_X = torch.rand([args["ntrain"], args["dim"]], dtype=DEFAULT_DTYPE, device=device)
         train_Y = f(unnormalize(train_X.to("cpu"), bounds.to("cpu"))).to(dtype=train_X.dtype, device=device)
         train_X_full = train_X.clone()
         train_Y_full = train_Y.clone()
@@ -263,7 +264,7 @@ for REP in range(REPS):
                 if partial_sent:
                     print("Using Partial Evaluation",flush=True)
                     tc_i = []
-                    y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=torch.double,device=device) #torch.zeros(q, problem.num_objectives)
+                    y_new = torch.full([xnew_size, args["nobj"]], torch.nan, dtype=DEFAULT_DTYPE,device=device) #torch.zeros(q, problem.num_objectives)
                     for i in range(xnew_size):
                         tc = computeTC(x_new[i],mt_model=mt_model)
 

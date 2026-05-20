@@ -12,6 +12,7 @@ from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarizat
 from botorch.sampling.normal import SobolQMCNormalSampler
 #from botorch.acquisition.multi_objective.parego import qLogNParEGO
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
+from botorch.acquisition.multi_objective.parego import qLogNParEGO
 from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.utils import (
     sample_optimal_points,
@@ -33,6 +34,7 @@ from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_ca
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
+from qpots.config import as_tensor, get_device, get_dtype, tensor_kwargs, to_runtime
 
 
 class Acquisition:
@@ -45,7 +47,8 @@ class Acquisition:
         func: Function,
         gps: ModelListGP,
         cons: Optional[Callable] = None,
-        device: torch.device = torch.device("cpu"),
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
         q: int = 1,
         NUM_RESTARTS: int = 10,
         RAW_SAMPLES: int = 512
@@ -66,8 +69,12 @@ class Acquisition:
         cons : Optional[Callable], optional
             A vector-valued function representing inequality constraints. If provided, 
             the acquisition function will account for feasibility constraints.
-        device : torch.device, optional
-            The computational device to use (CPU or GPU). Defaults to ``torch.device("cpu")``.
+        device : torch.device or str, optional
+            The computational device to use. If omitted, qPOTS uses CUDA when
+            available and falls back to CPU.
+        dtype : torch.dtype, optional
+            Floating-point precision. If omitted, qPOTS uses the dtype attached
+            to ``gps`` when present, otherwise ``qpots.config.DEFAULT_DTYPE``.
         q : int, optional
             The number of candidate points to sample per iteration. Defaults to 1.
         NUM_RESTARTS : int, optional
@@ -80,7 +87,11 @@ class Acquisition:
         self.func = func
         self.gps = gps
         self.cons = cons
-        self.device = device
+        inferred_device = getattr(gps, "device", None)
+        inferred_dtype = getattr(gps, "dtype", None)
+        self.device = get_device(device if device is not None else inferred_device)
+        self.dtype = get_dtype(dtype if dtype is not None else inferred_dtype)
+        self.tkwargs = tensor_kwargs(device=self.device, dtype=self.dtype)
         self.q = q
         self.NUM_RESTARTS = NUM_RESTARTS
         self.RAW_SAMPLES = RAW_SAMPLES
@@ -136,23 +147,26 @@ class Acquisition:
         """
         torch.manual_seed(1024 + seed_iter)
         samples_list = []
+        x = to_runtime(x, self.device, self.dtype)
+        bounds = to_runtime(gps.bounds, self.device, self.dtype)
 
         for gp_model in gps.models:
-            posterior = gp_model.posterior(normalize(x.to(self.device), gps.bounds.to(self.device)))
-            mean = posterior.mean.to(self.device)
-            covariance = posterior.mvn.covariance_matrix.to(self.device)
+            posterior = gp_model.posterior(normalize(x, bounds))
+            mean = posterior.mean.to(**self.tkwargs)
+            covariance = posterior.mvn.covariance_matrix.to(**self.tkwargs)
 
             if col_choice == "random":
-                indices = torch.randperm(covariance.shape[-1])[:m]
+                indices = torch.randperm(covariance.shape[-1], device=self.device)[:m]
             elif col_choice == "pareto":
                 if pareto_set is None:
                     raise ValueError("Pareto set is required for 'pareto' column choice.")
-                D = cdist(pareto_set.cpu(), x.cpu().numpy())
+                pareto_np = pareto_set.detach().cpu().numpy() if isinstance(pareto_set, torch.Tensor) else pareto_set
+                D = cdist(pareto_np, x.detach().cpu().numpy())
                 cand_indices = D.argmin(axis=-1)
-                indices = torch.unique(torch.tensor(cand_indices).argsort()[:m]).to(self.device)
+                indices = torch.unique(torch.as_tensor(cand_indices, device=self.device).argsort()[:m])
                 if len(indices) < m:
-                    extra_indices = torch.randperm(covariance.shape[-1])[:m - len(indices)].to(self.device)
-                    indices = torch.cat((indices, extra_indices)).to(self.device)
+                    extra_indices = torch.randperm(covariance.shape[-1], device=self.device)[:m - len(indices)]
+                    indices = torch.cat((indices, extra_indices))
             else:
                 raise NotImplementedError(f"Column choice '{col_choice}' is not implemented.")
 
@@ -161,13 +175,13 @@ class Acquisition:
             while True:
                 try:
                     L_mm_cov = torch.linalg.cholesky(
-                        apprx_covariance + reg * torch.eye(m).to(self.device)
-                    ).to(self.device)
+                        apprx_covariance + reg * torch.eye(m, **self.tkwargs)
+                    )
                     break
                 except torch.linalg.LinAlgError:
                     reg *= 10
 
-            z = torch.rand(m, dtype=torch.float64).to(self.device)
+            z = torch.rand(m, **self.tkwargs)
             sample = mean + K_nm @ (L_mm_cov @ z).reshape(-1, 1)
             samples_list.append(sample.detach())
 
@@ -203,8 +217,11 @@ class Acquisition:
             infeasible points penalized if constraints exist.
         """
         torch.manual_seed(1024 + seed_iter)
+        x = to_runtime(x, self.device, self.dtype)
+        bounds = to_runtime(gps.bounds, self.device, self.dtype)
         Ys_ = [
-            model.posterior(normalize(x, gps.bounds)).sample().reshape(-1, 1) for model in gps.models
+            model.posterior(normalize(x, bounds)).sample().reshape(-1, 1).to(**self.tkwargs)
+            for model in gps.models
         ]
         Ys_ = unstandardize(torch.cat(Ys_, -1), gps.train_y.to(self.device))
 
@@ -238,9 +255,10 @@ class Acquisition:
         """
         torch.manual_seed(1024 + seed_iter)
 
+        x = to_runtime(x, self.device, self.dtype)
         model=gps.models[0]
         #Do not need appending of task IDS for posterior sampling:
-        Ys_=model.posterior(normalize(x,gps.bounds)).sample() #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
+        Ys_=model.posterior(normalize(x,to_runtime(gps.bounds, self.device, self.dtype))).sample().to(**self.tkwargs) #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
         Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
         
         if self.ncons > 0:
@@ -292,6 +310,7 @@ class Acquisition:
             """Store the latest NSGA-II Pareto set for Nyström column selection."""
             pareto_set[0] = res.opt.get("X")
 
+        bounds = to_runtime(bounds, self.device, self.dtype)
         pareto_set = [None]
 
         if kwargs["nystrom"] == 1:
@@ -299,7 +318,7 @@ class Acquisition:
                 x.to(self.device),
                 self.gps,
                 int(0.2 * kwargs["iters"]),
-                normalize(torch.tensor(pareto_set[0]).to(self.device), bounds).cpu().numpy()
+                normalize(as_tensor(pareto_set[0], **self.tkwargs), bounds)
                 if pareto_set[0] is not None
                 else torch.zeros_like(x),
                 col_choice=kwargs["nychoice"],
@@ -310,6 +329,8 @@ class Acquisition:
                 n_obj=self.nobj,
                 xl=bounds[0].detach().cpu().numpy(),
                 xu=bounds[1].detach().cpu().numpy(),
+                device=self.device,
+                dtype=self.dtype,
             )
             res = nsga2(
                 pymoo_func_gp,
@@ -320,7 +341,7 @@ class Acquisition:
             )
         else:
             
-            if kwargs["mt"] == 1:
+            if kwargs.get("mt", 0) == 1:
                 gp_posterior_ = lambda x: self._mt_gp_posterior(
                     x.to(self.device), self.gps, seed_iter=iteration
                 )
@@ -334,6 +355,8 @@ class Acquisition:
                 n_obj=self.nobj,
                 xl=bounds[0].detach().cpu().numpy(),
                 xu=bounds[1].detach().cpu().numpy(),
+                device=self.device,
+                dtype=self.dtype,
             )
 
             res = nsga2(
@@ -343,10 +366,10 @@ class Acquisition:
                 seed=2430,
             )
         
-        if kwargs["partial_info"] == 1:
+        if kwargs.get("partial_info", 0) == 1:
             #12/31 Now using total_correlation for candidate selection
             selected_candidates, new_task_ids = select_candidates_total_correlation(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["threshold"]
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs.get("threshold")
             )
             return normalize(selected_candidates, bounds), new_task_ids
         else:
@@ -356,7 +379,7 @@ class Acquisition:
         
         return normalize(selected_candidates, bounds)
 
-    def qlogei(self, ref_point: Tensor = torch.tensor([0.0, 0.0])) -> Tensor:
+    def qlogei(self, ref_point: Tensor | None = None) -> Tensor:
         """
         Optimize the qLogEI acquisition function and return new candidate points.
 
@@ -372,16 +395,17 @@ class Acquisition:
             A tensor containing the new candidate points selected based on 
             qLogEI optimization.
         """
-        standard_bounds = torch.zeros(2, self.func.dim, device=self.device)
+        ref_point = as_tensor([0.0, 0.0], **self.tkwargs) if ref_point is None else to_runtime(ref_point, self.device, self.dtype)
+        standard_bounds = torch.zeros(2, self.func.dim, **self.tkwargs)
         standard_bounds[1] = 1
-        train_y = self.gps.train_y.to(self.device)
+        train_y = self.gps.train_y.to(**self.tkwargs)
         partitioning = FastNondominatedPartitioning(
-            ref_point=ref_point.to(self.device), Y=train_y[..., : self.nobj]
+            ref_point=ref_point, Y=train_y[..., : self.nobj]
         )
         model = ModelListGP(*self.gps.models).to(self.device)
         acq_func = qLogExpectedHypervolumeImprovement(
             model=model,
-            ref_point=ref_point.to(self.device),
+            ref_point=ref_point,
             partitioning=partitioning,
             constraints=[lambda Z: Z[..., -self.gps.ncons]],
         )
@@ -413,10 +437,10 @@ class Acquisition:
         """
         standard_bounds = torch.tensor(
             [[0.0] * self.func.dim, [1.0] * self.func.dim],
-            dtype=torch.double,
-        ).to(self.device)  # normalized bounds
-        train_x = self.gps.train_x.to(self.device)
-        train_y = self.gps.train_y.to(self.device)
+            **self.tkwargs,
+        )  # normalized bounds
+        train_x = self.gps.train_x.to(**self.tkwargs)
+        train_y = self.gps.train_y.to(**self.tkwargs)
         print(f"Inside parego: train_x shape: {train_x.shape}")
         sampler = SobolQMCNormalSampler(sample_shape=torch.Size([128]))
         model = ModelListGP(*self.gps.models).to(self.device)
@@ -424,7 +448,7 @@ class Acquisition:
 
         acq_func_list = []
         for _ in range(self.q):
-            weights = sample_simplex(self.func.nobj + self.gps.ncons).squeeze()
+            weights = sample_simplex(self.func.nobj + self.gps.ncons, **self.tkwargs).squeeze()
             objective = GenericMCObjective(get_chebyshev_scalarization(weights=weights, Y=pred))
             acq_func = qLogNoisyExpectedImprovement(
                 model=model,
@@ -457,10 +481,10 @@ class Acquisition:
         # Standardize bounds for optimization
         standard_bounds = torch.tensor(
             [[0.0] * self.func.dim, [1.0] * self.func.dim],
-            dtype=torch.double,
-        ).to(self.device)  # normalized bounds
+            **self.tkwargs,
+        )  # normalized bounds
 
-        train_x = self.gps.train_x.to(self.device)
+        train_x = self.gps.train_x.to(**self.tkwargs)
         sampler = SobolQMCNormalSampler(sample_shape=torch.Size([128]))
         model = ModelListGP(*self.gps.models).to(self.device)
 
@@ -495,12 +519,12 @@ class Acquisition:
             A tensor containing the candidate points selected by PESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
+        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, _ = sample_optimal_points(
             model=model,
-            bounds=bounds.double(),
+            bounds=bounds,
             num_samples=11,
             num_points=3,
             optimizer=random_search_optimizer,
@@ -510,7 +534,7 @@ class Acquisition:
 
         candidates, _ = optimize_acqf(
             acq_function=acqf,
-            bounds=bounds.double(),
+            bounds=bounds,
             q=self.q,
             num_restarts=5,
             raw_samples=512,
@@ -528,12 +552,12 @@ class Acquisition:
             A tensor containing the candidate points selected by MESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
+        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, pf = sample_optimal_points(
             model=model,
-            bounds=bounds.double(),
+            bounds=bounds,
             num_samples=10,
             num_points=10,
             optimizer=random_search_optimizer,
@@ -546,14 +570,19 @@ class Acquisition:
             hypercell_bounds=hypercell_bounds,
             estimation_type="LB",
         )
-        candidates, _ = optimize_acqf(
-            acq_function=acqf,
-            bounds=bounds.double(),
-            q=self.q,
-            num_restarts=8,
-            raw_samples=512,
-            sequential=True,
-        )
+        try:
+            candidates, _ = optimize_acqf(
+                acq_function=acqf,
+                bounds=bounds,
+                q=self.q,
+                num_restarts=8,
+                raw_samples=512,
+                sequential=True,
+            )
+        except RuntimeError as err:
+            if "probability tensor contains" not in str(err):
+                raise
+            candidates = self.sobol()
         return candidates.to(self.device)
 
     def jesmo(self) -> Tensor:
@@ -569,12 +598,12 @@ class Acquisition:
             A tensor containing the candidate points generated by JESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim), torch.ones(dim)]).to(self.device)
+        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, pf = sample_optimal_points(
             model=model,
-            bounds=bounds.double(),
+            bounds=bounds,
             num_samples=10,
             num_points=10,
             optimizer=random_search_optimizer,
@@ -589,14 +618,19 @@ class Acquisition:
             hypercell_bounds=hypercell_bounds,
             estimation_type="LB",
         )
-        candidates, _ = optimize_acqf(
-            acq_function=acqf,
-            bounds=bounds.double(),
-            q=self.q,
-            num_restarts=8,
-            raw_samples=512,
-            sequential=True,
-        )
+        try:
+            candidates, _ = optimize_acqf(
+                acq_function=acqf,
+                bounds=bounds,
+                q=self.q,
+                num_restarts=8,
+                raw_samples=512,
+                sequential=True,
+            )
+        except RuntimeError as err:
+            if "probability tensor contains" not in str(err):
+                raise
+            candidates = self.sobol()
         return candidates.to(self.device)
 
     def sobol(self) -> Tensor:
@@ -609,11 +643,11 @@ class Acquisition:
             A tensor of randomly generated candidate points using the Sobol sequence.
         """
         standard_bounds = torch.row_stack(
-            [torch.zeros(self.func.dim), torch.ones(self.func.dim)]
+            [torch.zeros(self.func.dim, **self.tkwargs), torch.ones(self.func.dim, **self.tkwargs)]
         )
         return draw_sobol_samples(
             bounds=standard_bounds, n=1, q=self.q
-        ).squeeze(1).to(self.device)
+        ).squeeze(0).to(self.device)
     
     def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int = 0):
         """

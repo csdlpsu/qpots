@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from botorch.test_functions.multi_objective import Penicillin
+from qpots.config import as_tensor
 
 
 def Penicillin_evaluate(x):
@@ -17,9 +18,9 @@ def Penicillin_evaluate(x):
     torch.Tensor
         True Penicillin benchmark objective values.
     """
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
 
-    problem = Penicillin()
+    problem = Penicillin().to(device=X.device, dtype=X.dtype)
 
     result = problem.evaluate_true(X)
 

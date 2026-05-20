@@ -4,13 +4,15 @@ import os
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.function import Function
 
 import torch
 from botorch.utils.transforms import unnormalize
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
         {
             "ntrain": 20,
@@ -18,7 +20,7 @@ args = dict(
             "reps": 20,
             "q": 1,
             "wd": ".",
-            "ref_point": torch.tensor([-300, -18]),
+            "ref_point": torch.tensor([-300, -18], device=device, dtype=DEFAULT_DTYPE),
             "dim": 2,
             "nobj": 2,
             "ncons": 0,
@@ -35,7 +37,7 @@ bounds = tf.get_bounds()
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 
 gps = ModelObject(train_x=train_x, train_y=train_y, bounds=bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)

@@ -10,6 +10,8 @@ import numpy as np
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 from qpots.function import Function
@@ -17,7 +19,7 @@ from qpots.function import Function
 import torch
 from botorch.utils.transforms import unnormalize, normalize
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
         {
             "ntrain": 40,
@@ -25,7 +27,7 @@ args = dict(
             "reps": 20,
             "q": 1,
             "wd": "..",
-            "ref_point": -1*torch.tensor([5.8, 4.0]),
+            "ref_point": -1*torch.tensor([5.8, 4.0], device=device, dtype=DEFAULT_DTYPE),
             "dim": 4,
             "nobj": 2,
             "ncons": 1,
@@ -44,7 +46,7 @@ cons = tf.get_cons()
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))[:, :1]]) # Stack constraints on top of objectives
 print(train_y)
@@ -92,4 +94,3 @@ for i in range(args["iters"]):
     t2 = time.time()
     times.append(t2 - t1)
     print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
-

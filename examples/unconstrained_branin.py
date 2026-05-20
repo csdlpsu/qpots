@@ -10,6 +10,8 @@ import numpy as np
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 
@@ -18,7 +20,7 @@ from qpots.function import Function
 from botorch.utils.transforms import unnormalize
 from botorch.test_functions.synthetic import Branin
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
     {
         "ntrain": 20,
@@ -26,7 +28,7 @@ args = dict(
         "reps": 20,
         "q": 1,
         "wd": ".",
-        "ref_point": torch.tensor([-300.0, -18.0]),
+        "ref_point": torch.tensor([-300.0, -18.0], device=device, dtype=DEFAULT_DTYPE),
         "dim": 2,
         "nobj": 2,
         "ncons": 0,
@@ -42,7 +44,7 @@ def custom_func(x):
     return f(x).unsqueeze(1).repeat(1, 2)
 
 # Set up problem
-bounds = torch.tensor([(-5, 10.), (0., 15.)])
+bounds = torch.tensor([(-5, 10.), (0., 15.)], device=device, dtype=DEFAULT_DTYPE)
 tf = Function(dim=args["dim"], nobj=args["nobj"], custom_func=custom_func, bounds=bounds)
 f = tf.evaluate
 bounds = tf.get_bounds()
@@ -51,7 +53,7 @@ os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
 
 # set up the training points
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double)
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE)
 train_y = f(unnormalize(train_x, bounds))
 
 # fit the GP models
@@ -79,11 +81,10 @@ for i in range(args["iters"]):
     gps = ModelObject(train_x, train_y, bounds, args["nobj"], args["ncons"], device=device)
     gps.fit_gp(single_objective=True)
 
-    np.save(f"{args['wd']}/train_x.npy", train_x)
-    np.save(f"{args['wd']}/train_y.npy", train_y)
+    np.save(f"{args['wd']}/train_x.npy", train_x.detach().cpu().numpy())
+    np.save(f"{args['wd']}/train_y.npy", train_y.detach().cpu().numpy())
     np.save(f"{args['wd']}/hv.npy", hvs)
     np.save(f"{args['wd']}/times.npy", times)
-
 
 
 

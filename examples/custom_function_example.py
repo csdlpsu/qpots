@@ -9,7 +9,9 @@ import numpy as np
 warnings.filterwarnings('ignore')
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.utils.utils import expected_hypervolume
 from qpots.function import Function
 
@@ -17,7 +19,7 @@ import torch
 from torch import Tensor
 from botorch.utils.transforms import unnormalize
 
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 args = dict(
         {
             "ntrain": 20,
@@ -25,7 +27,7 @@ args = dict(
             "reps": 1,
             "q": 1,
             "wd": ".",
-            "ref_point": -1*torch.tensor([5000., 300.]),
+            "ref_point": -1*torch.tensor([5000., 300.], device=device, dtype=DEFAULT_DTYPE),
             "dim": 2,
             "nobj": 2,
             "ncons": 0,
@@ -41,14 +43,14 @@ def custom_function(X: Tensor) -> Tensor:
     f2 = (X[:, 0] - 1)**2 + (X[:, 1] - 1)**2
     return -1*torch.stack([f1, f2], dim=-1)
 
-custom_bounds = torch.tensor([(-5., 0.), (10., 15.)]) # Normalized lower and upper bounds, two objectives. If bounds are unnormalized then it is proper to normalize them
-tf = Function(name=None, dim=args["dim"], nobj=args["nobj"], custom_func=custom_function, bounds=custom_bounds.detach().tolist())
+custom_bounds = torch.tensor([(-5., 0.), (10., 15.)], device=device, dtype=DEFAULT_DTYPE) # Normalized lower and upper bounds, two objectives. If bounds are unnormalized then it is proper to normalize them
+tf = Function(name=None, dim=args["dim"], nobj=args["nobj"], custom_func=custom_function, bounds=custom_bounds)
 f = tf.evaluate
 
 os.makedirs(args["wd"], exist_ok=True)
 torch.manual_seed(1023)
 
-train_x = torch.rand([args["ntrain"], args["dim"]], dtype=torch.double) # Normalized
+train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE) # Normalized
 train_y = f(unnormalize(train_x, bounds=custom_bounds))
 
 print(min(train_y[:,0]), min(train_y[:,1]))
@@ -56,7 +58,7 @@ print(min(train_y[:,0]), min(train_y[:,1]))
 gps = ModelObject(train_x=train_x, train_y=train_y, bounds=custom_bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
 gps.fit_gp()
 
-acq = Acquisition(f, gps, cons=None, device=device, q=args["q"])
+acq = Acquisition(tf, gps, cons=None, device=device, q=args["q"])
 
 times, hvs = [], []
 for i in range(args["iters"]):
@@ -76,8 +78,8 @@ for i in range(args["iters"]):
     gps = ModelObject(train_x, train_y, custom_bounds, args["nobj"], args["ncons"], device=device)
     gps.fit_gp()
 
-    np.save(f"{args['wd']}/train_x.npy", train_x)
-    np.save(f"{args['wd']}/train_y.npy", train_y)
+    np.save(f"{args['wd']}/train_x.npy", train_x.detach().cpu().numpy())
+    np.save(f"{args['wd']}/train_y.npy", train_y.detach().cpu().numpy())
     np.save(f"{args['wd']}/hv.npy", hvs)
     np.save(f"{args['wd']}/times.npy", times)
     

@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from botorch.test_functions import DTLZ1
+from qpots.config import as_tensor
 
 def dtlz1(x, dim):
     """
@@ -18,10 +19,10 @@ def dtlz1(x, dim):
     numpy.ndarray
         True two-objective DTLZ1 values.
     """
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
 
-    problem = DTLZ1(int(dim), num_objectives=2)
+    problem = DTLZ1(int(dim), num_objectives=2).to(device=X.device, dtype=X.dtype)
     result = problem.evaluate_true(X)
 
-    return result.numpy()
+    return result.detach().cpu().numpy()
     

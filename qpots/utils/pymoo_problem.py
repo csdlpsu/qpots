@@ -3,6 +3,7 @@ from pymoo.core.problem import Problem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from typing import Optional, Callable
+from qpots.config import as_tensor, get_device, get_dtype
 
 
 class PyMooFunction(Problem):
@@ -26,7 +27,16 @@ class PyMooFunction(Problem):
         Upper bound(s) for the input variables (default is 1.0).
     """
 
-    def __init__(self, func: Callable, n_var: int = 2, n_obj: int = 2, xl=0.0, xu=1.0):
+    def __init__(
+        self,
+        func: Callable,
+        n_var: int = 2,
+        n_obj: int = 2,
+        xl=0.0,
+        xu=1.0,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
+    ):
         """
         Create a Pymoo-compatible wrapper around a tensor-valued function.
 
@@ -45,6 +55,10 @@ class PyMooFunction(Problem):
             Lower decision-space bounds in the format expected by Pymoo.
         xu : float or array-like, optional
             Upper decision-space bounds in the format expected by Pymoo.
+        device : torch.device or str, optional
+            Device used when converting Pymoo's NumPy arrays to tensors.
+        dtype : torch.dtype, optional
+            Floating-point precision used when converting Pymoo's NumPy arrays.
 
         Notes
         -----
@@ -54,6 +68,8 @@ class PyMooFunction(Problem):
         """
         self.count = 1
         self.func = func
+        self.device = get_device(device)
+        self.dtype = get_dtype(dtype)
         self.n_var = n_var
         self.n_obj = n_obj
         self.xl = xl
@@ -81,9 +97,9 @@ class PyMooFunction(Problem):
         None
             Updates the `out` dictionary in-place with computed function values.
         """
-        x_ = torch.tensor(x, dtype=torch.double)
+        x_ = as_tensor(x, device=self.device, dtype=self.dtype)
         self.count += 1
-        out["F"] = self.func(x_).numpy()
+        out["F"] = self.func(x_).detach().cpu().numpy()
 
 
 def nsga2(

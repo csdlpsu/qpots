@@ -1,12 +1,13 @@
 import torch
 import numpy as np
 from botorch.test_functions import DTLZ1
+from qpots.config import as_tensor
 
 def dtlz1(x, dim):
-    X = torch.tensor(x, dtype=torch.float32)
+    X = as_tensor(x)
 
-    problem = DTLZ1(int(dim), num_objectives=3)
+    problem = DTLZ1(int(dim), num_objectives=3).to(device=X.device, dtype=X.dtype)
     result = problem.evaluate_true(X)
 
-    return result.numpy()
+    return result.detach().cpu().numpy()
     

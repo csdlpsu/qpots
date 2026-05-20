@@ -12,6 +12,8 @@ import numpy as np
 from mpi4py import MPI
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.model_object import ModelObject
 from qpots.function import Function
 from qpots.utils.utils import expected_hypervolume, arg_parser
@@ -25,12 +27,12 @@ world_rank = comm_world.Get_rank()
 
 # Get args from parser
 args = arg_parser() # For a list of arguments see the arg parser, these are command line arguments that must be set when running the code
-device = torch.device("cpu")
+device = DEFAULT_DEVICE
 
 tf = Function(name=args.func, dim=args.dim, nobj=args.nobj)
 f = tf.evaluate
 bounds = tf.get_bounds()
-args.ref_point = torch.tensor(args.ref_point, dtype=torch.double)
+args.ref_point = torch.tensor(args.ref_point, device=device, dtype=DEFAULT_DTYPE)
 cons = tf.get_cons()
 
 os.makedirs(args.wd, exist_ok=True)
@@ -40,7 +42,7 @@ for rep in range(args.reps):
         hvs, times = [], []
         torch.manual_seed(1024 + rep)
 
-        train_x = torch.rand([args.ntrain, args.dim], dtype=torch.double, device=device)
+        train_x = torch.rand([args.ntrain, args.dim], dtype=DEFAULT_DTYPE, device=device)
         train_y = f(unnormalize(train_x, bounds)).to(device)
         train_y = torch.column_stack([train_y, cons(unnormalize(train_x, bounds))]).to(device) # Stack constraints on top of objectives
 
@@ -75,7 +77,7 @@ for rep in range(args.reps):
             gps.fit_gp()
 
             # Save at each iteration for post processing
-            np.save(f"{args.wd}/train_x_{rep}.npy", train_x)
-            np.save(f"{args.wd}/train_y_{rep}.npy", train_y)
+            np.save(f"{args.wd}/train_x_{rep}.npy", train_x.detach().cpu().numpy())
+            np.save(f"{args.wd}/train_y_{rep}.npy", train_y.detach().cpu().numpy())
             np.save(f"{args.wd}/hv_{rep}.npy", hvs)
             np.save(f"{args.wd}/times_{rep}.npy", times)

@@ -30,6 +30,7 @@ from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.sampling import SobolQMCNormalSampler
+from qpots.config import as_tensor
 
 def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
     """
@@ -49,7 +50,7 @@ def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) ->
         The unstandardized output tensor.
     """
     mean = torch.nanmean(train_y, dim=0)
-    std = torch.from_numpy(np.nanstd(train_y.cpu().numpy(), axis=0, ddof=1)).to(train_y)
+    std = torch.from_numpy(np.nanstd(train_y.detach().cpu().numpy(), axis=0, ddof=1)).to(train_y)
     return Y * std + mean
 
 def get_model_identified_hv_maximizing_set(
@@ -245,7 +246,7 @@ def get_model_identified_hv_maximizing_set(
             else:
                 f=y
                 
-            out["F"] = -f.cpu().numpy()
+            out["F"] = -f.detach().cpu().numpy()
 
     pymoo_problem = PosteriorMeanPymooProblem()
     algorithm = NSGA2(
@@ -260,12 +261,12 @@ def get_model_identified_hv_maximizing_set(
         seed=seed,
         verbose=False,
     )
-    X = torch.tensor(
+    X = torch.as_tensor(
         res.X,
         **tkwargs,
     )
     X = unnormalize(X, problem.get_bounds().to(tkwargs["device"]))
-    Y = torch.tensor(-res.F, **tkwargs) #problem(X)
+    Y = torch.as_tensor(-res.F, **tkwargs) #problem(X)
     # compute HV
     partitioning = FastNondominatedPartitioning(ref_point=ref_point, Y=Y)
     return res, partitioning.compute_hypervolume().item()
@@ -346,8 +347,8 @@ def qmaximin(train_X, X, *, q: int = 1, return_index: bool = False, return_dista
     n_cand = X_flat.shape[0]
     k = min(q, n_cand)
 
-    # Work in float for distance computations
-    Xf = X_flat.float()
+    # Preserve the configured precision for distance computations.
+    Xf = X_flat
     x_norm2 = (Xf * Xf).sum(dim=1)  # precompute ||x||^2 for all candidates
 
     # Initial min distance to the existing training set
@@ -356,7 +357,7 @@ def qmaximin(train_X, X, *, q: int = 1, return_index: bool = False, return_dista
         # the first pick will be arbitrary (the first argmax).
         min_dist = torch.full((n_cand,), float("inf"), device=X.device, dtype=Xf.dtype)
     else:
-        trainf = train_flat.float()
+        trainf = train_flat.to(dtype=Xf.dtype)
         min_dist = torch.cdist(Xf, trainf).min(dim=1).values  # (n_cand,)
 
     selected = torch.empty((k,), dtype=torch.long, device=X.device)

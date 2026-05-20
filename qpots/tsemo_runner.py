@@ -1,9 +1,23 @@
 import torch
 import numpy as np
 import os
+import sys
+import types
+from qpots.config import as_tensor
 try:
     import matlab.engine
 except ImportError:
+    matlab = types.ModuleType("matlab")
+    matlab.engine = types.ModuleType("matlab.engine")
+    def _missing_start_matlab(*args, **kwargs):
+        raise ImportError("MATLAB Engine for Python is not installed.")
+    class _MissingEngineError(Exception):
+        pass
+    matlab.double = lambda value: value
+    matlab.engine.start_matlab = _missing_start_matlab
+    matlab.engine.EngineError = _MissingEngineError
+    sys.modules.setdefault("matlab", matlab)
+    sys.modules.setdefault("matlab.engine", matlab.engine)
     print("Failed to import matlab engine")
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 
@@ -174,7 +188,8 @@ class TSEMORunner:
         for i in range(iters):
             # Compute the hypervolume for the current set of points (up to train_shape + i)
             bd1 = FastNondominatedPartitioning(
-                ref_point=ref_point, Y=-1 * torch.tensor(Y[: train_shape + i, :])
+                ref_point=ref_point,
+                Y=-1 * as_tensor(Y[: train_shape + i, :], device=ref_point.device, dtype=ref_point.dtype),
             )
             hv.append(bd1.compute_hypervolume())
             pf = bd1.pareto_Y  # Store the current Pareto front

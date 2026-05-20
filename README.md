@@ -72,13 +72,12 @@ import torch
 from botorch.utils.transforms import unnormalize
 
 from qpots.acquisition import Acquisition
+from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
 from qpots.function import Function
 from qpots.model_object import ModelObject
 from qpots.utils.utils import expected_hypervolume
 
 warnings.filterwarnings("ignore")
-
-device = torch.device("cpu")
 
 settings = {
     "ntrain": 20,
@@ -86,7 +85,7 @@ settings = {
     "reps": 20,
     "q": 1,
     "wd": ".",
-    "ref_point": torch.tensor([-300.0, -18.0]),
+    "ref_point": torch.tensor([-300.0, -18.0], device=DEFAULT_DEVICE, dtype=DEFAULT_DTYPE),
     "dim": 2,
     "nobj": 2,
     "ncons": 0,
@@ -101,7 +100,12 @@ bounds = test_function.get_bounds()
 
 torch.manual_seed(1023)
 
-train_x = torch.rand(settings["ntrain"], settings["dim"], dtype=torch.double)
+train_x = torch.rand(
+    settings["ntrain"],
+    settings["dim"],
+    device=DEFAULT_DEVICE,
+    dtype=DEFAULT_DTYPE,
+)
 train_y = evaluate(unnormalize(train_x, bounds))
 
 model = ModelObject(
@@ -110,11 +114,10 @@ model = ModelObject(
     bounds=bounds,
     nobj=settings["nobj"],
     ncons=settings["ncons"],
-    device=device,
 )
 model.fit_gp()
 
-acquisition = Acquisition(test_function, model, device=device, q=settings["q"])
+acquisition = Acquisition(test_function, model, q=settings["q"])
 
 for iteration in range(settings["iters"]):
     start = time.time()
@@ -140,11 +143,21 @@ for iteration in range(settings["iters"]):
         bounds=bounds,
         nobj=settings["nobj"],
         ncons=settings["ncons"],
-        device=device,
     )
     model.fit_gp()
-    acquisition = Acquisition(test_function, model, device=device, q=settings["q"])
+    acquisition = Acquisition(test_function, model, q=settings["q"])
 ```
+
+## Runtime Precision And Device
+
+$q\texttt{POTS}$ keeps precision and device selection in one easy-to-find place: [`qpots/config.py`](qpots/config.py). By default, the package uses CUDA when PyTorch detects a GPU and otherwise falls back to CPU:
+
+```python
+DEFAULT_DTYPE = torch.float64
+DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+```
+
+Change `DEFAULT_DTYPE` to `torch.float32` for lower-memory single precision, or keep `torch.float64` for the default double-precision behavior used by BoTorch. Core package tensors created by $q\texttt{POTS}$ inherit these settings unless you pass an explicit `device` or `dtype`.
 
 For complete scripts, see:
 

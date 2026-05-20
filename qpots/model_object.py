@@ -8,6 +8,7 @@ from gpytorch.kernels import ScaleKernel, MaternKernel
 from botorch.models.transforms.outcome import Standardize
 from botorch.exceptions.errors import ModelFittingError
 from gpytorch.priors import GammaPrior
+from qpots.config import get_device, get_dtype, tensor_kwargs, to_runtime
 
 
 class ModelObject:
@@ -26,9 +27,10 @@ class ModelObject:
         bounds: torch.Tensor,
         nobj: int, 
         ncons: int, 
-        ntrain: int,
-        device: str, 
+        ntrain: int | None = None,
+        device: str | torch.device | None = None, 
         noise_std: float = 1e-6,
+        dtype: torch.dtype | None = None,
         
         
     ):
@@ -48,19 +50,28 @@ class ModelObject:
             The number of objective functions.
         ncons : int
             The number of constraints in the problem.
-        device : torch.device
-            The computation device, either `"cpu"` or `"cuda"`.
+        ntrain : int, optional
+            Number of initial fully observed training points. If omitted, all
+            rows in ``train_x`` are treated as initial training points.
+        device : torch.device or str, optional
+            Computation device. If omitted, qPOTS uses CUDA when available and
+            falls back to CPU.
         noise_std : float, optional
             The standard deviation of noise added to the GP model. Defaults to `1e-6`.
+        dtype : torch.dtype, optional
+            Floating-point precision. If omitted, qPOTS uses
+            ``qpots.config.DEFAULT_DTYPE``.
         """
-        self.train_x = train_x.to(device)
-        self.train_y = train_y.to(device)
+        self.device = get_device(device)
+        self.dtype = get_dtype(dtype)
+        self.tkwargs = tensor_kwargs(device=self.device, dtype=self.dtype)
+        self.train_x = to_runtime(train_x, self.device, self.dtype)
+        self.train_y = to_runtime(train_y, self.device, self.dtype)
         self.noise_std = noise_std
-        self.bounds = bounds
+        self.bounds = to_runtime(bounds, self.device, self.dtype)
         self.nobj = nobj
         self.ncons = ncons
-        self.ntrain = ntrain
-        self.device = device
+        self.ntrain = self.train_x.shape[0] if ntrain is None else ntrain
         self.models = []
         self.mlls = []
         self.prev_state_dict = None
@@ -85,7 +96,7 @@ class ModelObject:
         """
         num_outputs = self.train_y.shape[-1]
         print("Fitting GPs", flush=True)
-        train_yvar = torch.ones_like(self.train_y[..., 0], dtype=torch.double).to(self.device).reshape(-1, 1) * self.noise_std ** 2
+        train_yvar = torch.ones_like(self.train_y[..., 0], dtype=self.dtype).reshape(-1, 1) * self.noise_std ** 2
 
         # Fit a GP model for each objective
         
@@ -93,7 +104,7 @@ class ModelObject:
             print("fitting single objective")
             model = SingleTaskGP(
                 self.train_x,
-                standardize(self.train_y[..., 1]).reshape(-1, 1).double(),
+                standardize(self.train_y[..., 1]).reshape(-1, 1).to(dtype=self.dtype),
             ).to(self.train_x.device)
 
             for i in range(2):
@@ -108,7 +119,7 @@ class ModelObject:
                 print(f"Fit: {i}", flush=True)
                 model = SingleTaskGP(
                     self.train_x,
-                    standardize(self.train_y[..., i]).reshape(-1, 1).double(),
+                    standardize(self.train_y[..., i]).reshape(-1, 1).to(dtype=self.dtype),
                     train_yvar
                 ).to(self.train_x.device)
 
@@ -147,7 +158,10 @@ class ModelObject:
         train_y_mt = train_y_std[:self.ntrain].reshape(-1,1).to(self.device)
       
         
-        task_ids_init = torch.arange(self.nobj+self.ncons).expand(self.ntrain,self.nobj+self.ncons).reshape(-1,1).to(self.device)
+        task_ids_init = torch.arange(
+            self.nobj + self.ncons,
+            **self.tkwargs,
+        ).expand(self.ntrain, self.nobj+self.ncons).reshape(-1,1)
         train_x_mt = torch.cat([x_init,task_ids_init],dim=-1).to(self.device)
     
         
@@ -161,7 +175,7 @@ class ModelObject:
             
             if rows.numel() > 0: 
                 new_x = new_x[rows].to(self.device)
-                new_task_ids = tasks.unsqueeze(1).to(self.device)
+                new_task_ids = tasks.unsqueeze(1).to(**self.tkwargs)
                 new_x_mt = torch.cat([new_x,new_task_ids],dim=-1).to(self.device)
                 train_x_mt=torch.cat([train_x_mt,new_x_mt],dim=0).to(self.device)
                 train_y_mt=torch.cat([train_y_mt,new_y[rows, tasks].reshape(-1,1)]).to(self.device)
@@ -224,7 +238,7 @@ class ModelObject:
         if single_objective:
             model = SingleTaskGP(
                 self.train_x,
-                standardize(self.train_y[..., i]).reshape(-1, 1).double(),
+                standardize(self.train_y[..., i]).reshape(-1, 1).to(dtype=self.dtype),
             ).to(self.train_x.device)
 
             for i in range(2):
@@ -238,7 +252,7 @@ class ModelObject:
                 print(f"Fit: {i}", flush=True)
                 model = SingleTaskGP(
                     self.train_x,
-                    standardize(self.train_y[..., i]).reshape(-1, 1).double(),
+                    standardize(self.train_y[..., i]).reshape(-1, 1).to(dtype=self.dtype),
                 ).to(self.train_x.device)
 
                 self.models.append(model)
@@ -271,6 +285,5 @@ class ModelObject:
         std = torch.where(std == 0, torch.ones_like(std), std) 
 
         Y_std = (Y - mean) / std
-        return torch.where(torch.isnan(Y), torch.tensor(float('nan'), device=Y.device), Y_std)
+        return torch.where(torch.isnan(Y), torch.full_like(Y, float("nan")), Y_std)
     
-
