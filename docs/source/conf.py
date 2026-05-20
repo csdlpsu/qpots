@@ -16,7 +16,7 @@ sys.modules.update((mod_name, MagicMock()) for mod_name in MOCK_MODULES)
 project = 'qPOTS: Batch Pareto Optimal Thompson Sampling'
 copyright = '2025, Kade E. Carlson, Ashwin Renganathan'
 author = 'Kade E. Carlson, Ashwin Renganathan'
-release = '1.0.8'
+release = '2.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
