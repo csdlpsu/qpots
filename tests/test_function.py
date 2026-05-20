@@ -138,4 +138,71 @@ def test_custom_function_with_batch_evaluate(custom_function):
     res = obj.evaluate(X)
     assert isinstance(res, torch.Tensor), "Result is not a Tensor"
     assert res.shape == torch.Size([3, obj.nobj]), "Batch evaluation shape mismatch"
-    
+
+
+# ---------------------------------------------------------------------------
+# Tests added for improved coverage
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,dim,nobj", [
+    ("dtlz1", 5, 2),
+    ("dtlz2", 5, 2),
+    ("dtlz3", 5, 2),
+    ("dtlz7", 5, 2),
+    ("dh1", 4, 2),
+    ("gmm", 2, 2),
+    ("penicillin", 7, 3),
+    ("vehicle", 5, 3),
+    ("carside", 7, 4),
+    ("zdt3", 6, 2),
+    ("discbrake", 4, 2),
+    ("mw7", 2, 2),
+    ("weldedbeam", 4, 2),
+    ("constrainedbc", 2, 2),
+])
+def test_registered_functions_smoke(name, dim, nobj):
+    """Every registered function name must initialise and return the right output shape."""
+    obj = Function(name=name, dim=dim, nobj=nobj)
+    actual_dim = obj.bounds.shape[1]
+    x = obj.bounds[0] + torch.rand(3, actual_dim, dtype=torch.float64) * (
+        obj.bounds[1] - obj.bounds[0]
+    )
+    res = obj.evaluate(x)
+    assert isinstance(res, torch.Tensor), f"{name}: result is not a Tensor"
+    assert res.shape == torch.Size([3, nobj]), (
+        f"{name}: expected shape [3, {nobj}], got {res.shape}"
+    )
+
+
+def test_evaluate_output_columns_match_nobj_not_dim():
+    """evaluate() returns nobj columns even when nobj differs from dim."""
+    obj = Function("dtlz1", dim=5, nobj=2)  # 5 input dims, 2 objectives
+    x = obj.bounds[0] + torch.rand(4, 5, dtype=torch.float64) * (obj.bounds[1] - obj.bounds[0])
+    res = obj.evaluate(x)
+    assert res.shape == torch.Size([4, 2]), f"Expected [4, nobj=2], got {res.shape}"
+
+
+def test_single_objective_branin():
+    """branin wraps a single-objective function; evaluate() produces one output per point."""
+    obj = Function("branin", dim=2, nobj=1)
+    assert obj.get_cons() is None
+    x = obj.bounds[0] + torch.rand(3, 2, dtype=torch.float64) * (obj.bounds[1] - obj.bounds[0])
+    res = obj.evaluate(x)
+    assert isinstance(res, torch.Tensor)
+    assert res.shape[0] == 3, "Batch dimension must be preserved"
+
+
+def test_constrained_function_evaluate_returns_only_objectives():
+    """evaluate() yields objective values only; constraints are accessed via get_cons()."""
+    obj = Function("weldedbeam", dim=4, nobj=2)
+    assert obj.get_cons() is not None, "WeldedBeam must expose constraint callable"
+    actual_dim = obj.bounds.shape[1]
+    x = obj.bounds[0] + torch.rand(2, actual_dim, dtype=torch.float64) * (
+        obj.bounds[1] - obj.bounds[0]
+    )
+    res = obj.evaluate(x)
+    assert res.shape == torch.Size([2, 2]), (
+        "evaluate() must return [n, nobj] only, not [n, nobj+ncons]"
+    )
+    cons_res = obj.get_cons()(x)
+    assert isinstance(cons_res, torch.Tensor)

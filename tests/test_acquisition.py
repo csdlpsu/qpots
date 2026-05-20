@@ -301,3 +301,101 @@ def test_jesmo(real_func, q):
     assert isinstance(result, torch.Tensor), "Output is not a tensor"
     assert result.shape == torch.Size([q, 2]), f"Output shape is incorrect: {result.shape}"
     assert (result >= 0.0).all() and (result <= 1.0).all(), "Result is out of bounds"
+
+
+# ---------------------------------------------------------------------------
+# Tests added for improved coverage
+# ---------------------------------------------------------------------------
+
+def test_sobol(real_func):
+    """sobol() returns a tensor within the unit hypercube for q=1."""
+    train_x = torch.rand(10, real_func.dim, dtype=torch.float64)
+    train_y = real_func.evaluate(train_x)
+    gps = ModelObject(
+        train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(),
+        nobj=real_func.nobj, ncons=0, device=torch.device("cpu"),
+    )
+    gps.fit_gp()
+    acq = Acquisition(func=real_func, gps=gps, q=1)
+
+    result = acq.sobol()
+
+    assert isinstance(result, torch.Tensor)
+    assert result.shape[-1] == real_func.dim, "Last dimension must equal input dim"
+    assert (result >= 0.0).all() and (result <= 1.0).all(), "Sobol samples must be in [0, 1]"
+
+
+def test_gp_posterior_sign_convention(mock_func):
+    """_gp_posterior must negate GP samples so they are ready for NSGA-II minimization."""
+    gps = Mock()
+    gps.nobj = 2
+    gps.ncons = 0
+    gps.bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
+    # Positive training data → mean >> 0 → unstandardised zero-sample = mean > 0
+    gps.train_y = torch.tensor([[5.0, 10.0], [7.0, 12.0]], dtype=torch.float64)
+    # Standardised sample of zero → unstandardise → mean of train_y (positive)
+    model_1 = Mock()
+    model_1.posterior.return_value.sample.return_value = torch.zeros(2, 1, dtype=torch.float64)
+    model_2 = Mock()
+    model_2.posterior.return_value.sample.return_value = torch.zeros(2, 1, dtype=torch.float64)
+    gps.models = [model_1, model_2]
+
+    acq = Acquisition(func=mock_func, gps=gps)
+    x = torch.rand(2, 2, dtype=torch.float64)
+    result = acq._gp_posterior(x, gps, seed_iter=1)
+
+    assert (result < 0).all(), (
+        "_gp_posterior must return -Ys so that NSGA-II can minimise (expected all negative)"
+    )
+
+
+def test_qpots_constrained(real_func):
+    """qpots must handle ncons > 0 without error and return valid normalised candidates."""
+    n = 50
+    train_x = torch.rand(n, real_func.dim, dtype=torch.float64)
+    train_y_obj = real_func.evaluate(train_x)
+    # Synthetic feasible constraint column (all positive)
+    train_y_con = torch.rand(n, 1, dtype=torch.float64)
+    train_y = torch.cat([train_y_obj, train_y_con], dim=-1)
+
+    gps = ModelObject(
+        train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(),
+        nobj=real_func.nobj, ncons=1, device=torch.device("cpu"),
+    )
+    gps.fit_gp()
+    acq = Acquisition(func=real_func, gps=gps, q=2)
+
+    kwargs = {
+        "nystrom": 0, "iters": 5, "dim": real_func.dim,
+        "nychoice": "random", "q": 2, "ngen": 5,
+    }
+    result = acq.qpots(real_func.get_bounds(), iteration=1, **kwargs)
+
+    assert isinstance(result, torch.Tensor)
+    assert result.shape == torch.Size([2, real_func.dim])
+    assert (result >= 0.0).all() and (result <= 1.0).all(), "Candidates must be in unit hypercube"
+
+
+@pytest.mark.parametrize("q", [1, 2])
+def test_qpots_output_in_unit_hypercube(real_func, q):
+    """qpots normalises candidates; all returned values must lie in [0, 1]."""
+    n = 50
+    train_x = torch.rand(n, real_func.dim, dtype=torch.float64)
+    train_y = real_func.evaluate(train_x)
+    gps = ModelObject(
+        train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(),
+        nobj=real_func.nobj, ncons=0, device=torch.device("cpu"),
+    )
+    gps.fit_gp()
+    acq = Acquisition(func=real_func, gps=gps, q=q)
+
+    kwargs = {
+        "nystrom": 0, "iters": 5, "dim": real_func.dim,
+        "nychoice": "random", "q": q, "ngen": 5,
+    }
+    result = acq.qpots(real_func.get_bounds(), iteration=1, **kwargs)
+
+    assert (result >= -1e-6).all() and (result <= 1.0 + 1e-6).all(), (
+        f"qpots candidates not in [0,1]^dim: min={result.min().item():.4f}, "
+        f"max={result.max().item():.4f}"
+    )

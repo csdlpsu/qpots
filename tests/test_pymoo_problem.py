@@ -84,5 +84,26 @@ def test_pymoo_problem_evaluate():
     assert out["F"].shape == (1, 2), "Function output shape mismatch"
 
 
+# ---------------------------------------------------------------------------
+# Tests added for improved coverage
+# ---------------------------------------------------------------------------
 
+def test_nsga2_callback_invoked_each_generation():
+    """The callback must be called at least once per generation (not just > 0 total)."""
+    ngen = 10
 
+    def func(X):
+        f1 = X[:, 0] ** 2 + X[:, 1] ** 2
+        f2 = (X[:, 0] - 1) ** 2 + (X[:, 1] - 1) ** 2
+        return -torch.stack([f1, f2], dim=-1)
+
+    problem = PyMooFunction(func=func, n_var=2, n_obj=2, xl=0.0, xu=1.0)
+    mock_callback = Mock()
+
+    res = nsga2(problem=problem, ngen=ngen, pop_size=50, seed=42, callback=mock_callback)
+
+    assert mock_callback.call_count >= ngen, (
+        f"Callback should be called at least once per generation "
+        f"(expected >= {ngen}, got {mock_callback.call_count})"
+    )
+    assert np.all(res.X >= 0.0) and np.all(res.X <= 1.0)

@@ -64,21 +64,29 @@ def test_tsemo_run(tsemo_runner, tmp_path):
     np.testing.assert_array_equal(np.load(save_dir / "Y_1.npy"), np.array(mock_Y_out))
     np.testing.assert_array_equal(np.load(save_dir / "times_1.npy"), np.array(mock_times))
 
+def _make_matlab_mock():
+    """Return a Mock that satisfies TSEMORunner.__init__'s matlab.engine.start_matlab() call."""
+    matlab_mock = Mock()
+    matlab_mock.engine.start_matlab.return_value = Mock()
+    return matlab_mock
+
+
 def test_tsemo_hypervolume():
     Y = torch.tensor([[1.0, 2.0], [2.0, 1.5], [1.5, 1.8], [3.0, 2.5]])
     ref_point = torch.tensor([4.0, 4.0])
     train_shape = 2
     iters = 2
 
-    tsemo_runner = TSEMORunner(
-        func="test_function",
-        x=[],
-        y=[],
-        lb=[],
-        ub=[],
-        iters=iters,
-        batch_number=1
-    )
+    with patch("qpots.tsemo_runner.matlab", _make_matlab_mock(), create=True):
+        tsemo_runner = TSEMORunner(
+            func="test_function",
+            x=[],
+            y=[],
+            lb=[],
+            ub=[],
+            iters=iters,
+            batch_number=1
+        )
 
     hv, pf = tsemo_runner.tsemo_hypervolume(Y, ref_point, train_shape, iters)
 
@@ -86,3 +94,41 @@ def test_tsemo_hypervolume():
     assert len(hv) == iters, "Hypervolume list length mismatch"
     assert isinstance(pf, torch.Tensor), "Pareto front should be a tensor"
     assert pf.shape[1] == 2, "Pareto front shape mismatch"
+
+
+# ---------------------------------------------------------------------------
+# Tests added for improved coverage
+# ---------------------------------------------------------------------------
+
+def test_tsemo_hypervolume_multi_iteration():
+    """tsemo_hypervolume accumulates one HV entry per iteration and HV is non-decreasing."""
+    # Negative Y values (as would come from a negated BoTorch function).
+    # After negation inside tsemo_hypervolume the points become positive and dominate ref.
+    Y = torch.tensor([
+        [-1.0, -2.0], [-2.0, -1.5], [-1.5, -1.8],
+        [-3.0, -2.5], [-2.8, -2.0], [-1.2, -3.0],
+    ], dtype=torch.float64)
+    ref_point = torch.tensor([-4.0, -4.0])  # worse than all -Y values
+    train_shape = 2
+    iters = 4  # produces HV for slices [:2], [:3], [:4], [:5]
+
+    with patch("qpots.tsemo_runner.matlab", _make_matlab_mock(), create=True):
+        runner = TSEMORunner(
+            func="test_function",
+            x=[], y=[], lb=[], ub=[],
+            iters=iters, batch_number=1,
+        )
+
+    hv, pf = runner.tsemo_hypervolume(Y, ref_point, train_shape, iters)
+
+    assert isinstance(hv, list)
+    assert len(hv) == iters, "Must return one HV value per iteration"
+    assert all(float(v) >= 0 for v in hv), "All hypervolume values must be non-negative"
+    # Adding more points can only maintain or improve hypervolume
+    for i in range(1, len(hv)):
+        assert float(hv[i]) >= float(hv[i - 1]) - 1e-8, (
+            f"Hypervolume decreased at iteration {i}: "
+            f"{float(hv[i-1]):.6f} → {float(hv[i]):.6f}"
+        )
+    assert isinstance(pf, torch.Tensor)
+    assert pf.shape[1] == 2

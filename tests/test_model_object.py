@@ -75,4 +75,33 @@ def test_no_objectives():
         gps.fit_gp()
 
 
+# ---------------------------------------------------------------------------
+# Tests added for improved coverage
+# ---------------------------------------------------------------------------
+
+def test_fit_gp_called_twice_accumulates_models(mock_gp):
+    """fit_gp appends to models/mlls; calling it twice doubles the list lengths."""
+    mock_gp.fit_gp()
+    count_after_first = len(mock_gp.models)
+    mock_gp.fit_gp()
+    assert len(mock_gp.models) == 2 * count_after_first, (
+        "Calling fit_gp twice must accumulate models (no implicit reset)"
+    )
+    assert len(mock_gp.mlls) == 2 * count_after_first
+
+
+def test_fit_gp_single_objective(mock_gp):
+    """fit_gp(single_objective=True) always produces exactly 2 model slots."""
+    mock_gp.fit_gp(single_objective=True)
+    assert len(mock_gp.models) == 2
+    assert len(mock_gp.mlls) == 2
+    assert all(isinstance(m, SingleTaskGP) for m in mock_gp.models)
+
+
+def test_model_predictions_positive_variance(mock_gp):
+    """After fitting, the posterior variance at any test point must be strictly positive."""
+    mock_gp.fit_gp()
+    test_x = torch.tensor([[0.5, 0.3]], dtype=torch.float64)
+    variance = mock_gp.models[0].posterior(test_x).variance
+    assert (variance > 0).all(), "GP posterior variance must be strictly positive"
 
