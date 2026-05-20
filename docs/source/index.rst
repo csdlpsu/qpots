@@ -18,6 +18,11 @@ qPOTS Documentation
    qpots_acquisition
    qpots_function
    qpots_model_object
+   qpots_ts_emo_wrappers
+   qpots_tsemo_runner
+   qpots_utils_acq_utils
+   qpots_utils_pymoo_problem
+   qpots_utils_tc_utils
    qpots_utils_utils
 
 .. toctree::
@@ -26,4 +31,3 @@ qPOTS Documentation
 
    constrained_example
    unconstrained_example
-

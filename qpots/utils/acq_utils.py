@@ -83,24 +83,23 @@ def initialize_model(train_x_list, train_obj_list, bounds):
     Parameters
     ----------
     train_x_list : list of torch.Tensor
-        List of input tensors, one per objective/constraint.
-        Each tensor has shape (n_i, d), where:
-            - n_i = number of training points for output i
-            - d   = input dimension
+        List of input tensors, one per objective or constraint. Each tensor has
+        shape ``n_i x d``, where ``n_i`` is the number of training points for
+        output ``i`` and ``d`` is the input dimension. Different outputs may
+        use different input sets.
         Note: This allows different datasets per output (i.e., not necessarily shared X).
 
     train_obj_list : list of torch.Tensor
         List of output tensors (objectives and/or constraints), one per model.
         Each tensor has shape (n_i, 1).
 
-        Convention:
-        - Objectives and constraints should already be combined into this list.
-        - Constraints are typically modeled the same way as objectives here.
+        Objectives and constraints should already be combined into this list.
+        Constraints are modeled the same way as objectives here.
 
     bounds : torch.Tensor
-        Tensor of shape (2, d) specifying lower and upper bounds for each input dimension:
-            bounds[0] = lower bounds
-            bounds[1] = upper bounds
+        Tensor of shape ``2 x d`` specifying lower and upper bounds for each
+        input dimension. ``bounds[0]`` contains lower bounds and ``bounds[1]``
+        contains upper bounds.
 
     Returns
     -------
@@ -157,24 +156,20 @@ def hypervolume_from_posterior_mean_gp(
     Parameters
     ----------
     model : ModelListGP or compatible GP model
-        A trained BoTorch model. Must support `.posterior(X)` and return a
-        posterior with `.mean` of shape (n, m), where:
-            - n = number of input points
-            - m = number of outputs (objectives + constraints)
+        A trained BoTorch model. Must support ``posterior(X)`` and return a
+        posterior with ``mean`` of shape ``n x m``, where ``n`` is the number
+        of input points and ``m`` is the number of outputs.
 
     X : torch.Tensor
-        Input tensor of shape (n, d), where:
-            - n = number of candidate points
-            - d = input dimension
+        Candidate design points with shape ``n x d``.
         These are the design points at which the posterior mean is evaluated.
 
     ncons : int
         Number of constraint outputs included in the model.
         Assumes that the last `ncons` outputs correspond to constraints.
 
-        Constraint convention:
-        - A point is feasible if all constraint values >= 0.
-        - Infeasible points are penalized and excluded from Pareto computation.
+        A point is feasible if all constraint values are nonnegative.
+        Infeasible points are penalized and excluded from Pareto computation.
 
     ref_point : array-like or torch.Tensor
         Reference point for hypervolume computation.
@@ -182,41 +177,20 @@ def hypervolume_from_posterior_mean_gp(
         (i.e., total outputs minus constraints).
 
     maximize : bool
-        Whether the objectives are being maximized.
-        - If True: hypervolume is computed directly.
-        - If False: objectives and reference point are negated to convert
-          the problem into a maximization formulation.
+        Whether the objectives are being maximized. If ``False``, objectives
+        and the reference point are negated to convert the calculation into a
+        maximization problem.
 
     Returns
     -------
     hv : torch.Tensor (scalar)
         The computed hypervolume of the non-dominated posterior mean set.
 
-    Workflow
-    --------
-    1. Move inputs and reference point to the model's device and dtype.
-    2. Evaluate posterior mean at X.
-    3. If constraints exist:
-        - Identify feasible points (all constraints >= 0).
-        - Penalize infeasible points by assigning large negative values.
-        - Remove constraint dimensions from the objective tensor.
-    4. Convert to maximization problem if necessary.
-    5. Extract the non-dominated subset of points.
-    6. Compute hypervolume using the provided reference point.
-
     Notes
     -----
-    - This uses the posterior mean only (no uncertainty).
-    - Infeasible points are heavily penalized (-1e12) to ensure they are
-      excluded from the Pareto front.
-    - Assumes constraints are ordered as the last `ncons` outputs.
-    - Hypervolume is computed using BoTorch's `Hypervolume` utility.
-
-    Edge Cases
-    ----------
-    - If no non-dominated points exist (e.g., empty input), returns 0.
-    - Behavior depends on correctness of `ref_point`:
-        incorrect reference points can yield misleading or even negative HV.
+    This uses the posterior mean only, not posterior samples. It assumes
+    constraints are ordered as the final ``ncons`` outputs. If no nondominated
+    points are available, it returns a scalar zero tensor.
     """
     model.eval()
 
@@ -419,6 +393,23 @@ def optimize_qnehvi_and_get_observation(model, train_x, sampler, q, problem,stan
 
 #Generate sobol Data
 def generate_sobol_data(n,problem):
+    """
+    Generate an initial Sobol design and evaluate the optimization problem.
+
+    Parameters
+    ----------
+    n : int
+        Number of Sobol points to draw.
+    problem : callable
+        BoTorch-style test problem with a ``bounds`` attribute and a callable
+        interface that evaluates inputs in the original design space.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor]
+        ``(train_x, train_obj_true)`` where ``train_x`` has shape ``n x d`` and
+        ``train_obj_true`` contains the corresponding objective values.
+    """
     # generate training data
     train_x = draw_sobol_samples(bounds=problem.bounds, n=n, q=1).squeeze(1)
     train_obj_true = problem(train_x)
@@ -508,6 +499,24 @@ def choose_competitive_decoupled_candidate(
     return best
 
 def _validate_mask(mask: Tensor | None, num_outputs: int) -> None:
+    """
+    Validate a decoupled-evaluation mask used by competitive acquisition rules.
+
+    Parameters
+    ----------
+    mask : torch.Tensor or None
+        Boolean tensor of shape ``q x num_outputs``. Each row marks which model
+        outputs would be observed for the associated candidate. ``None`` means
+        all outputs are observed.
+    num_outputs : int
+        Total number of model outputs, including objectives and constraints.
+
+    Raises
+    ------
+    ValueError
+        If ``mask`` has the wrong shape or contains a row with no selected
+        output.
+    """
     if mask is None:
         return
     if mask.ndim != 2 or mask.shape[-1] != num_outputs:
@@ -529,10 +538,35 @@ class _CompetitiveDecouplingMixin:
     X_evaluation_mask: Tensor | None
 
     def _set_X_evaluation_mask(self, X_evaluation_mask: Tensor | None) -> None:
+        """
+        Set and validate the output-observation mask for the next acquisition call.
+
+        Parameters
+        ----------
+        X_evaluation_mask : torch.Tensor or None
+            Boolean ``q x M`` mask selecting the outputs to observe. Passing
+            ``None`` restores coupled evaluation of all outputs.
+        """
         _validate_mask(X_evaluation_mask, self.model.num_outputs)
         self.X_evaluation_mask = X_evaluation_mask
 
     def _selected_output_indices(self, q: int) -> list[int]:
+        """
+        Return output indices selected by the current decoupling mask.
+
+        Parameters
+        ----------
+        q : int
+            Acquisition batch size. Masked competitive decoupling currently
+            supports only ``q=1`` because it compares one candidate-output pair
+            at a time.
+
+        Returns
+        -------
+        list[int]
+            Selected output indices. If no mask is set, all outputs are
+            returned.
+        """
         if self.X_evaluation_mask is None:
             return list(range(self.model.num_outputs))
         if q != 1:
@@ -542,6 +576,24 @@ class _CompetitiveDecouplingMixin:
         return self.X_evaluation_mask[0].nonzero(as_tuple=False).view(-1).tolist()
 
     def _selected_output_mask(self, q: int, *, dtype: torch.dtype, device: torch.device) -> Tensor:
+        """
+        Build a numeric one-dimensional mask for selected model outputs.
+
+        Parameters
+        ----------
+        q : int
+            Acquisition batch size forwarded to ``_selected_output_indices``.
+        dtype : torch.dtype
+            Desired dtype for the returned mask.
+        device : torch.device
+            Desired device for the returned mask.
+
+        Returns
+        -------
+        torch.Tensor
+            Tensor of length ``model.num_outputs`` with ones at selected
+            outputs and zeros elsewhere.
+        """
         idx = self._selected_output_indices(q)
         mask = torch.zeros(self.model.num_outputs, dtype=dtype, device=device)
         mask[idx] = 1.0
@@ -550,16 +602,63 @@ class _CompetitiveDecouplingMixin:
 
 ##PESMO decoupled
 class qDecoupledPESMO(_CompetitiveDecouplingMixin, qMultiObjectivePredictiveEntropySearch):
+    """
+    Predictive entropy search acquisition with competitive decoupled outputs.
+
+    This subclass adapts BoTorch's
+    ``qMultiObjectivePredictiveEntropySearch`` so that a single output can be
+    scored at a candidate point. It is useful for decoupled multiobjective
+    experiments where evaluating every objective or constraint at every point
+    is unnecessary or has different cost.
+
+    Notes
+    -----
+    The implementation is intentionally narrow: when an evaluation mask is set,
+    it supports the common competitive setting ``q=1`` and compares one
+    candidate-output pair at a time.
+    """
+
     def __init__(
         self,
         *args,
         X_evaluation_mask: Tensor | None = None,
         **kwargs,
     ) -> None:
+        """
+        Initialize the decoupled PESMO acquisition function.
+
+        Parameters
+        ----------
+        *args
+            Positional arguments forwarded to BoTorch's
+            ``qMultiObjectivePredictiveEntropySearch``.
+        X_evaluation_mask : torch.Tensor or None, optional
+            Optional boolean mask of shape ``q x M`` selecting which outputs
+            are observed for each candidate. ``None`` means all outputs are
+            observed.
+        **kwargs
+            Keyword arguments forwarded to the BoTorch base acquisition.
+        """
         super().__init__(*args, **kwargs)
         self._set_X_evaluation_mask(X_evaluation_mask)
 
     def _masked_logdet(self, cov: Tensor, q: int) -> Tensor:
+        """
+        Compute the PES log-determinant term for selected outputs only.
+
+        Parameters
+        ----------
+        cov : torch.Tensor
+            Predictive covariance tensor produced by BoTorch's PES utilities.
+        q : int
+            Batch size represented in ``cov``.
+
+        Returns
+        -------
+        torch.Tensor
+            Log-determinant contribution averaged over Pareto samples and
+            restricted to the selected output mask when one is active.
+        """
         if self.X_evaluation_mask is None:
             return _compute_log_determinant(cov=cov, q=q)
         log_det_cov = torch.logdet(cov[..., 0:q, 0:q])
@@ -570,6 +669,21 @@ class qDecoupledPESMO(_CompetitiveDecouplingMixin, qMultiObjectivePredictiveEntr
         return (log_det_cov * weights).sum(dim=-1).mean(dim=-1)
 
     def _compute_information_gain(self, X: Tensor) -> Tensor:
+        """
+        Evaluate the approximate PESMO information gain at candidate points.
+
+        Parameters
+        ----------
+        X : torch.Tensor
+            Candidate tensor with BoTorch acquisition shape
+            ``batch_shape x q x d``.
+
+        Returns
+        -------
+        torch.Tensor
+            Acquisition value for each batch element. Larger values indicate
+            higher expected information gain about the Pareto-optimal set.
+        """
         tkwargs = {"dtype": X.dtype, "device": X.device}
         batch_shape = X.shape[0:-2]
         q = X.shape[-2]
@@ -668,8 +782,19 @@ class qDecoupledPESMO(_CompetitiveDecouplingMixin, qMultiObjectivePredictiveEntr
     @t_batch_mode_transform()
     @average_over_ensemble_models
     def forward(self, X: Tensor) -> Tensor:
+        """
+        Evaluate the acquisition function at ``X``.
+
+        Parameters
+        ----------
+        X : torch.Tensor
+            Candidate set in BoTorch acquisition format.
+
+        Returns
+        -------
+        torch.Tensor
+            Information-gain acquisition value for each batch element.
+        """
         return self._compute_information_gain(X)
     
-
-
 

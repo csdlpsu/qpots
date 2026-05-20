@@ -168,7 +168,22 @@ def get_model_identified_hv_maximizing_set(
     seed=2429+multiplier
 
     class PosteriorMeanPymooProblem(Problem):
+        """
+        Pymoo problem whose objectives come from a GP posterior sample.
+
+        The class is local to ``get_model_identified_hv_maximizing_set`` so it
+        can close over the fitted model, training targets, reference point, and
+        constraint count. Pymoo calls ``_evaluate`` repeatedly during NSGA-II.
+        """
+
         def __init__(self):
+            """
+            Initialize normalized decision bounds and the posterior sampler.
+
+            The decision variables live in the unit hypercube. Objective values
+            are sampled with a fixed-seed Sobol QMC sampler so repeated calls
+            are reproducible within an optimization run.
+            """
             super().__init__(
                 n_var=dim,
                 n_obj=problem.nobj,
@@ -183,6 +198,25 @@ def get_model_identified_hv_maximizing_set(
             ) # Sampler for consistency when calling _evaluate()
 
         def _evaluate(self, x, out, *args, **kwargs):
+            """
+            Evaluate GP-sampled objectives for Pymoo's NSGA-II loop.
+
+            Parameters
+            ----------
+            x : numpy.ndarray
+                Candidate design matrix in normalized coordinates.
+            out : dict
+                Pymoo output dictionary. This method writes objective values to
+                ``out["F"]``.
+            *args, **kwargs
+                Extra Pymoo arguments accepted for API compatibility.
+
+            Notes
+            -----
+            Outputs are unstandardized back to the original objective scale.
+            If constraints are present, infeasible rows are penalized before
+            objectives are negated for Pymoo's minimization convention.
+            """
             X = torch.from_numpy(x).to(**tkwargs)
 
             #wihout Sampler
@@ -237,7 +271,21 @@ def get_model_identified_hv_maximizing_set(
     return res, partitioning.compute_hypervolume().item()
 
 def _unravel_index(flat_idx: int, shape):
-    """Like numpy.unravel_index(flat_idx, shape), but without numpy."""
+    """
+    Convert a flat index into a multidimensional index tuple.
+
+    Parameters
+    ----------
+    flat_idx : int
+        Index into the flattened version of an array.
+    shape : Sequence[int]
+        Shape of the original array.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Index tuple equivalent to ``numpy.unravel_index(flat_idx, shape)``.
+    """
     idx = []
     for s in reversed(shape):
         flat_idx, r = divmod(flat_idx, s)
@@ -246,21 +294,36 @@ def _unravel_index(flat_idx: int, shape):
 
 def qmaximin(train_X, X, *, q: int = 1, return_index: bool = False, return_distance: bool = False):
     """
-    Greedy *sequential* maximin (a.k.a. farthest-point sampling):
-        x_{n+1} = argmax_{x in X}   min_{y in train_X} ||x - y||
-        x_{n+2} = argmax_{x in X}   min_{y in train_X ∪ {x_{n+1}}} ||x - y||
-        ...
-        x_{n+q} = ...
+    Select diverse candidates with greedy sequential maximin sampling.
 
-    train_X: tensor/array of shape (..., d)
-    X:       tensor/array of shape (..., d)   (same last dimension d)
-    q:       number of points to pick (unique picks, up to len(X))
+    At each step, this routine picks the candidate whose distance to the
+    closest observed or already-selected point is largest. This is also known
+    as farthest-point sampling and is useful when a sampled Pareto set contains
+    many near-duplicates.
 
-    Returns:
-      - by default: best_points of shape (k, d) where k = min(q, num_candidates)
-      - optionally indices: list[tuple] of length k (indices into X.shape[:-1])
-      - optionally distances: tensor of shape (k,) giving the maximin distance
-        at the time each point was selected.
+    Parameters
+    ----------
+    train_X : array-like or torch.Tensor
+        Existing observed design points with shape ``... x d``.
+    X : array-like or torch.Tensor
+        Candidate design points with shape ``... x d``. The final dimension
+        must match ``train_X``.
+    q : int, optional
+        Number of candidates to select. If fewer candidates are available,
+        all available candidates are returned.
+    return_index : bool, optional
+        If ``True``, also return index tuples into ``X.shape[:-1]`` for the
+        selected candidates.
+    return_distance : bool, optional
+        If ``True``, also return the maximin distance achieved when each point
+        was selected.
+
+    Returns
+    -------
+    torch.Tensor or tuple
+        Selected points with shape ``k x d``, where
+        ``k = min(q, num_candidates)``. Optional indices and distances are
+        appended when requested.
     """
     train_X = torch.as_tensor(train_X)
     X = torch.as_tensor(X)
@@ -330,18 +393,30 @@ def qmaximin(train_X, X, *, q: int = 1, return_index: bool = False, return_dista
 #New function for jitter
 def cholesky_with_jitter(R, initial_jitter=1e-6, max_jitter=1e-2, factor=10.0):
     """
-    Attempt Cholesky decomposition of R.
-    If it fails, increase diagonal jitter iteratively until success.
+    Compute a Cholesky factor, increasing diagonal jitter on failure.
     
-    Args:
-        R: (n, n) correlation/covariance matrix
-        initial_jitter: starting jitter on diagonal
-        max_jitter: maximum allowed jitter
-        factor: factor to increase jitter each attempt
-    
-    Returns:
-        L: Cholesky factor
-        final_jitter: the jitter that worked
+    Parameters
+    ----------
+    R : torch.Tensor
+        Square covariance or correlation matrix.
+    initial_jitter : float, optional
+        Initial diagonal jitter to try after the first failure.
+    max_jitter : float, optional
+        Maximum allowed jitter before raising an error.
+    factor : float, optional
+        Multiplicative increase applied to the jitter after each failed
+        attempt.
+
+    Returns
+    -------
+    torch.Tensor
+        Lower-triangular Cholesky factor.
+
+    Raises
+    ------
+    RuntimeError
+        If the decomposition still fails after the jitter exceeds
+        ``max_jitter``.
     """
     jitter = initial_jitter
     while True:
@@ -411,9 +486,9 @@ def computeTC(x,mt_model):
     ----------
     x : torch.Tensor
         Input tensor. Can be of shape (..., d) or flat.
-        Internally reshaped to (-1, d_eff), where:
-            - d_eff = dim - 1
-        (assumes last column may correspond to a task index or is excluded)
+        Internally reshaped to ``-1 x d_eff``, where ``d_eff`` is one fewer
+        than the model training-input dimension. This assumes the final column
+        of the training inputs is a task index and is not present in ``x``.
 
     mt_model : MultiTaskGP or compatible model
         A trained multi-output GP model that supports `.posterior(X)`
@@ -431,19 +506,17 @@ def computeTC(x,mt_model):
     - The covariance matrix reflects dependencies between outputs
       (e.g., tasks in a MultiTaskGP).
     - Total correlation (TC) is a multivariate generalization of mutual
-      information:
-          TC = sum of marginal entropies − joint entropy
-      It is zero if outputs are independent and positive otherwise.
-    - Assumes `corr_and_total_correlation(cov)` returns:
-          (correlation_matrix, total_correlation)
+      information: ``TC = sum of marginal entropies - joint entropy``. It is
+      zero if outputs are independent and positive otherwise.
+
+    Assumes ``corr_and_total_correlation(cov)`` returns
+    ``(correlation_matrix, total_correlation)``.
 
     Assumptions
     -----------
-    - `mt_model.train_inputs[0]` exists and has shape (..., d_total)
-    - The effective feature dimension is `dim - 1`
-      (e.g., last column may be a task index)
-    - Posterior covariance is fully materialized and small enough
-      to fit in memory
+    ``mt_model.train_inputs[0]`` must exist, the effective feature dimension is
+    one fewer than the training-input dimension, and the posterior covariance
+    must be small enough to materialize in memory.
     """
     dim=mt_model.train_inputs[0].shape[-1]
     post = mt_model.posterior(x.view(-1,dim-1))
@@ -541,7 +614,7 @@ def argmax_mi_subset_bruteforce(
     return_all_scores: bool = False,
 ) -> Dict[str, Any]:
     """
-    Brute-force search over subsets S to maximize I(Y_S ; Y_{Sc}) (Gaussian assumption).
+    Brute-force search over output subsets under a Gaussian assumption.
 
     You can pass either:
       - cov_or_samples as a (K,K) covariance matrix, OR
@@ -552,14 +625,17 @@ def argmax_mi_subset_bruteforce(
     cov_or_samples : np.ndarray
         (K,K) covariance OR (N,K) samples.
     subset_size : int or None
-        If provided, restrict search to subsets with |S| == subset_size.
+        If provided, restrict search to subsets whose size equals
+        ``subset_size``.
         If None, searches all non-trivial subsets (excluding empty/full).
     jitter, base : see above
     assume_samples : bool or None
         If None, auto-detect: (K,K) => covariance; otherwise => samples.
     deduplicate_complements : bool
-        If subset_size is None, avoid evaluating both S and Sc by restricting to |S| <= floor(K/2).
-        This is safe because I(S;Sc) == I(Sc;S).
+        If ``subset_size`` is ``None``, avoid evaluating both a subset and its
+        complement by restricting the search to subsets of size at most
+        ``floor(K / 2)``. This is safe because the split mutual information is
+        symmetric.
     return_all_scores : bool
         If True, returns a dict mapping subset tuples -> MI score (can be large: O(2^K)).
 
@@ -630,7 +706,34 @@ def argmax_mi_subset_bruteforce(
 
 def fit_mtgp(train_X, train_Y,d,n_train,device,dtype):
     """
-    Outdated
+    Fit a two-output ``MultiTaskGP`` in long format.
+
+    Parameters
+    ----------
+    train_X : torch.Tensor
+        Shared input locations with shape ``n_train x d``.
+    train_Y : torch.Tensor
+        Two-output response matrix with shape ``n_train x 2``.
+    d : int
+        Number of design variables. The task feature is appended at column
+        ``d``.
+    n_train : int
+        Number of initial training rows to use.
+    device : torch.device or str
+        Device on which to build and fit the model.
+    dtype : torch.dtype
+        Floating point dtype for model tensors.
+
+    Returns
+    -------
+    botorch.models.MultiTaskGP
+        Fitted rank-1 multitask GP model.
+
+    Notes
+    -----
+    This helper is retained for older multitask experiments. New code should
+    prefer ``ModelObject.fit_multitask_gp`` because it supports an arbitrary
+    number of objectives/constraints and missing outputs.
     """
     mt_model_kind = "MultiTaskGP(task_feature)"
 
@@ -659,11 +762,30 @@ def wide_to_long_mt(
     task_feature: int,        # index of task feature in the AUGMENTED input (d+1 dims)
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Convert wide (q x d, q x K) into MultiTaskGP long format:
-      X_long: (n_obs, d+1) with a task index inserted at task_feature
-      Y_long: (n_obs, 1)
+    Convert partially observed wide data into ``MultiTaskGP`` long format.
 
-    We drop NaNs in y.
+    Parameters
+    ----------
+    x : torch.Tensor
+        Candidate locations with shape ``q x d`` and no task feature.
+    y : torch.Tensor
+        Output matrix with shape ``q x K``. Missing or intentionally skipped
+        outputs should be represented by ``NaN``.
+    task_feature : int
+        Column where the task index is inserted in the augmented ``d + 1``
+        dimensional design matrix.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor]
+        ``X_long`` with shape ``n_obs x (d + 1)`` and ``Y_long`` with shape
+        ``n_obs x 1``. Only finite entries of ``y`` are included.
+
+    Raises
+    ------
+    ValueError
+        If inputs are not two-dimensional, row counts do not match, the task
+        feature is invalid, or no finite observations are present.
     """
     if x.ndim != 2 or y.ndim != 2:
         raise ValueError(f"Expected x,y to be 2D. Got x.ndim={x.ndim}, y.ndim={y.ndim}.")
@@ -713,16 +835,34 @@ def update_mtgp_with_new_data(
     refit_hyperparams: bool = True,
 ) -> MultiTaskGP:
     """
-    Update an existing MultiTaskGP with new (x_new, y_new) where y_new has NaNs
-    for unevaluated objectives.
+    Rebuild a ``MultiTaskGP`` after adding partially observed data.
 
-    Recommended approach:
-      1) Convert new data to long format (drop NaNs)
-      2) Recover existing training data in *raw* outcome space
-      3) Concatenate
-      4) Rebuild a new MultiTaskGP so Standardize(m=1) is re-fit on the expanded data
-      5) Warm-start hypers from old mt_model (excluding outcome_transform buffers)
-      6) Optionally refit hypers
+    New observations are supplied in wide format with ``NaN`` values for
+    outputs that were not evaluated. The function converts those observations
+    to long format, recovers the existing model's raw training targets,
+    concatenates old and new data, rebuilds a fresh ``MultiTaskGP``, and
+    warm-starts compatible hyperparameters from the previous model.
+
+    Parameters
+    ----------
+    mt_model : botorch.models.MultiTaskGP
+        Existing fitted multitask model.
+    x_new : torch.Tensor
+        New design points with shape ``q x d`` and no task feature.
+    y_new : torch.Tensor
+        New outputs with shape ``q x K``. Entries that were not evaluated must
+        be ``NaN``.
+    task_feature : int
+        Location of the task-feature column in the augmented inputs.
+    rank : int, optional
+        Rank parameter for the rebuilt ``MultiTaskGP``.
+    refit_hyperparams : bool, optional
+        If ``True``, refit the marginal log likelihood after rebuilding.
+
+    Returns
+    -------
+    botorch.models.MultiTaskGP
+        Updated multitask model containing old and newly observed data.
     """
     # Put new tensors on same device/dtype as the model
     p = next(mt_model.parameters())

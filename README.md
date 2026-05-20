@@ -148,7 +148,7 @@ for iteration in range(settings["iters"]):
 
 For complete scripts, see:
 
-- [Unconstrained Branin-Currin](examples/unconstrained_branin_currin.py)
+- [Unconstrained Branin](examples/unconstrained_branin.py)
 - [Constrained optimization](examples/constrained_example.py)
 - [Custom objective functions](examples/custom_function_example.py)
 - [Multiple acquisition functions](examples/multiple_acquisitions_example.py)

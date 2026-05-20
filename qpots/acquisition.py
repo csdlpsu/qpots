@@ -283,12 +283,13 @@ class Acquisition:
         Returns
         -------
         Tensor or Tuple[Tensor, Tensor]
-            - If ``partial_info == 0``: A normalized tensor of selected candidate points after Pareto Optimal 
-            Thompson Sampling..
-            - If ``partial_info == 1``: A tuple containing the normalized candidates and their
-            corresponding task IDs, ``(candidates, task_ids)``.
+            If ``partial_info == 0``, returns a normalized tensor of selected
+            candidate points. If ``partial_info == 1``, returns
+            ``(candidates, task_ids)``, where ``task_ids`` records which
+            objectives or constraints should be evaluated at each candidate.
         """
         def track_pareto(res):
+            """Store the latest NSGA-II Pareto set for Nyström column selection."""
             pareto_set[0] = res.opt.get("X")
 
         pareto_set = [None]

@@ -1,7 +1,8 @@
 Unconstrained Example
 =====================
 
-This example demonstrates how to use **qPOTS** for multi-objective optimization on the **BraninCurrin** function from BoTorch. 
+This example demonstrates how to use **qPOTS** for a simple unconstrained
+multi-objective optimization workflow.
 It is a non-HPC implementation designed for local execution.
 
 Overview
@@ -15,10 +16,10 @@ Overview
 Script Details
 --------------
 
-.. literalinclude:: ../../examples/unconstrained_branin_currin.py
+.. literalinclude:: ../../examples/unconstrained_branin.py
    :language: python
    :linenos:
-   :caption: botorch_qpots_example.py
+   :caption: unconstrained_branin.py
 
 .. How It Works
 .. ------------
@@ -62,7 +63,6 @@ To run the script locally, use:
 
 .. code-block:: sh
 
-   python unconstrained_branin_currin.py
+   python examples/unconstrained_branin.py
 
 Ensure dependencies such as **BoTorch**, **PyTorch**, and **qPOTS** are installed.
-

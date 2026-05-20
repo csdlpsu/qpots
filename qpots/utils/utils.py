@@ -439,7 +439,7 @@ def argmax_mi_subset_bruteforce(
     return_all_scores: bool = False,
 ) -> Dict[str, Any]:
     """
-    Brute-force search over subsets S to maximize I(Y_S ; Y_{Sc}) (Gaussian assumption).
+    Brute-force search over output subsets under a Gaussian assumption.
 
     You can pass either:
       - cov_or_samples as a (K,K) covariance matrix, OR
@@ -450,14 +450,17 @@ def argmax_mi_subset_bruteforce(
     cov_or_samples : np.ndarray
         (K,K) covariance OR (N,K) samples.
     subset_size : int or None
-        If provided, restrict search to subsets with |S| == subset_size.
+        If provided, restrict search to subsets whose size equals
+        ``subset_size``.
         If None, searches all non-trivial subsets (excluding empty/full).
     jitter, base : see above
     assume_samples : bool or None
         If None, auto-detect: (K,K) => covariance; otherwise => samples.
     deduplicate_complements : bool
-        If subset_size is None, avoid evaluating both S and Sc by restricting to |S| <= floor(K/2).
-        This is safe because I(S;Sc) == I(Sc;S).
+        If ``subset_size`` is ``None``, avoid evaluating both a subset and its
+        complement by restricting the search to subsets of size at most
+        ``floor(K / 2)``. This is safe because the split mutual information is
+        symmetric.
     return_all_scores : bool
         If True, returns a dict mapping subset tuples -> MI score (can be large: O(2^K)).
 
@@ -537,7 +540,48 @@ def argmax_mi_subset_bruteforce(
 def select_candidates_total_correlation(gps: ModelObject, pareto_set: np.ndarray, device: torch.device, q: int = 1, seed: int = None, thresh: float = None
 ) -> Tensor:
     """
-    HEADER
+    Select Pareto-set candidates and choose which outputs to evaluate.
+
+    Candidate locations are chosen from the sampled Pareto set using the same
+    maximin-distance heuristic as ``select_candidates``. If ``thresh`` is
+    ``None``, each selected location receives a random subset of outputs. If a
+    threshold is provided, the posterior output covariance at each candidate is
+    converted to total correlation. Highly coupled candidates are assigned the
+    subset of outputs that maximizes Gaussian mutual information; weakly
+    coupled candidates are assigned all outputs.
+
+    Parameters
+    ----------
+    gps : ModelObject
+        Fitted model container. This routine expects ``gps.models[0]`` to be a
+        multi-output model whose posterior exposes the joint covariance across
+        outputs.
+    pareto_set : numpy.ndarray
+        Candidate Pareto-optimal design points returned by NSGA-II, with shape
+        ``n_pareto x d``.
+    device : torch.device
+        Device used for the returned candidate tensor.
+    q : int, optional
+        Maximum number of design points to select.
+    seed : int, optional
+        Reserved for reproducible random task selection.
+    thresh : float, optional
+        Total-correlation threshold. ``None`` enables random task selection;
+        otherwise candidates with ``abs(TC) > thresh`` use the mutual
+        information split and candidates below the threshold evaluate all
+        outputs.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor]
+        Selected candidates and a task-id matrix. Task entries contain the
+        output index to evaluate or ``NaN`` when that output is skipped.
+
+    Notes
+    -----
+    The feasibility/objective convention follows the rest of qPOTS: objectives
+    and constraints are modeled together, with constraints stored after the
+    objective columns.
     """
     #Old Maxmin distance
     #"""
@@ -623,8 +667,29 @@ def _augment_X_with_tasks(
     task_feature: int,
 ) -> torch.Tensor:
     """
-    Build the (n*num_tasks, d+1) design matrix expected by MultiTaskGP,
-    inserting a task index column at position `task_feature`.
+    Build long-format ``MultiTaskGP`` inputs from task-free design points.
+
+    Parameters
+    ----------
+    X : torch.Tensor
+        Base design matrix with shape ``n x d`` and no task feature.
+    num_tasks : int
+        Number of task/output indices to append.
+    task_feature : int
+        Position where the task index should be inserted in the augmented
+        ``d + 1`` dimensional input. Negative indices follow Python indexing.
+
+    Returns
+    -------
+    torch.Tensor
+        Augmented tensor with shape ``(n * num_tasks) x (d + 1)``. Rows are
+        grouped by task index.
+
+    Raises
+    ------
+    ValueError
+        If ``X`` is not two-dimensional or ``task_feature`` is invalid for the
+        augmented input dimension.
     """
     if X.ndim != 2:
         raise ValueError(f"Expected X to be 2D (n x d). Got shape {tuple(X.shape)}.")
@@ -757,16 +822,24 @@ def compute_true_hypervolume(
 
 def minmax_scale(x, dim=None,eps=1e-12):
     """
-    Rescale a tensor to [0, 1] along the each column (task).
+    Rescale a tensor to the ``[0, 1]`` interval.
     
-    Args:
-        x: input tensor (any shape)
-        dim: dimension along which to compute min/max. 
-             If None, scales over the entire tensor.
-        eps: small number to avoid division by zero
-        
-    Returns:
-        scaled tensor of same shape as x
+    Parameters
+    ----------
+    x : torch.Tensor
+        Input tensor of any shape.
+    dim : int or None, optional
+        Dimension along which to compute the minimum and maximum. If ``None``,
+        scale globally across the whole tensor.
+    eps : float, optional
+        Small denominator floor that prevents division by zero when all values
+        along a slice are equal.
+
+    Returns
+    -------
+    torch.Tensor
+        Tensor with the same shape as ``x`` and values scaled to ``[0, 1]`` up
+        to numerical precision.
     """
     x_min = x.min(dim=dim, keepdim=True).values if dim is not None else x.min()
     x_max = x.max(dim=dim, keepdim=True).values if dim is not None else x.max()

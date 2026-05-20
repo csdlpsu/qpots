@@ -62,7 +62,6 @@ Run the script using:
 
 .. code-block:: sh
 
-   python constrained_example.py
+   python examples/constrained_example.py
 
 Ensure that dependencies such as **BoTorch**, **PyTorch**, and **PyMoo** are installed.
-

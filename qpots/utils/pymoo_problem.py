@@ -27,6 +27,31 @@ class PyMooFunction(Problem):
     """
 
     def __init__(self, func: Callable, n_var: int = 2, n_obj: int = 2, xl=0.0, xu=1.0):
+        """
+        Create a Pymoo-compatible wrapper around a tensor-valued function.
+
+        Parameters
+        ----------
+        func : Callable
+            Function evaluated by Pymoo. It must accept a two-dimensional
+            ``torch.Tensor`` of candidate points and return an ``n x n_obj``
+            tensor of objective values. qPOTS passes posterior-sample
+            objectives here during the inner NSGA-II search.
+        n_var : int, optional
+            Number of design variables in each candidate point. Defaults to 2.
+        n_obj : int, optional
+            Number of objectives returned by ``func``. Defaults to 2.
+        xl : float or array-like, optional
+            Lower decision-space bounds in the format expected by Pymoo.
+        xu : float or array-like, optional
+            Upper decision-space bounds in the format expected by Pymoo.
+
+        Notes
+        -----
+        Pymoo minimizes by convention. Callers should pass a function whose
+        sign convention already matches the optimization they want Pymoo to
+        solve.
+        """
         self.count = 1
         self.func = func
         self.n_var = n_var

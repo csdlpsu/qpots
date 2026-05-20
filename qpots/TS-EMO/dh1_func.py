@@ -4,6 +4,21 @@ from botorch.test_functions.multi_objective import DH1
 
 
 def dh1_eval(x, dim):
+    """
+    Evaluate the DH1 multiobjective benchmark.
+
+    Parameters
+    ----------
+    x : array-like
+        Candidate points with ``dim`` design variables.
+    dim : int
+        Input dimensionality passed to BoTorch's ``DH1`` constructor.
+
+    Returns
+    -------
+    numpy.ndarray
+        True DH1 objective values.
+    """
     X = torch.tensor(x, dtype=torch.float32)
 
     problem = DH1(int(dim))
