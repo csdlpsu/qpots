@@ -13,7 +13,7 @@ authors = [
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
 ]
 description = "A BoTorch wrapper for solving multiobjective optimization problems with an implementation of the qPOTS algorithm."
-readme = "README.rst"
+readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
