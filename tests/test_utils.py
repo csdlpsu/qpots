@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 from botorch.utils.multi_objective.hypervolume import Hypervolume
 
-from qpots.utils.utils import unstandardize, expected_hypervolume, gen_filtered_cands, select_candidates, arg_parser
+from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, expected_hypervolume, gen_filtered_cands, select_candidates, select_candidates_partial_info, posterior_mean_fill, arg_parser
 
 @pytest.fixture
 def mock_gps():
@@ -21,6 +21,7 @@ def mock_gps():
     gps.train_x = torch.tensor([[0.1, 0.2], [0.2, 0.1], [0.15, 0.15]])
     gps.nobj = 2
     gps.ncons = 0
+    gps.models = [Mock()]  # posterior_mean_fill always accesses models[0]
     return gps
 
 def test_unstandardize():
@@ -98,6 +99,7 @@ def test_expected_hypervolume_min():
     gps.train_y = torch.tensor([[0.1, 0.2], [0.2, 0.1], [0.15, 0.15]], dtype=torch.float64)
     gps.nobj = 2
     gps.ncons = 0
+    gps.models = [Mock()]  # posterior_mean_fill always accesses models[0]
 
     hv, pf = expected_hypervolume(gps, min=True)
 
@@ -111,6 +113,7 @@ def test_expected_hypervolume_constrained():
     gps = Mock()
     gps.nobj = 2
     gps.ncons = 1
+    gps.models = [Mock()]  # posterior_mean_fill always accesses models[0]
     # Rows: [obj1, obj2, constraint];  third row is infeasible
     gps.train_y = torch.tensor([
         [2.0, 1.0, 0.5],   # feasible
@@ -138,6 +141,7 @@ def test_expected_hypervolume_min_constrained_known_bug():
     gps = Mock()
     gps.nobj = 2
     gps.ncons = 1
+    gps.models = [Mock()]  # posterior_mean_fill always accesses models[0]
     gps.train_y = torch.tensor([
         [0.1, 0.2, 0.5],   # feasible
         [0.2, 0.1, -0.1],  # infeasible

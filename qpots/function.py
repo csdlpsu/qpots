@@ -1,8 +1,9 @@
 from botorch.test_functions.multi_objective import (
-    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ7, GMM, DH1, Penicillin,
+    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ4, DTLZ5, DTLZ7, GMM, DH1, DH2, DH3, DH4, Penicillin,
     VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT3, DiscBrake, MW7, OSY, WeldedBeam
+    ZDT1,ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2,ToyRobust,BNH,SRN,CONSTR
 )
+#from examples.Fall_25_custom_functions import MultiFidelityCurrin, MultiFidelityForrester #Extra Multi-Fidelity Test functions 9/29
 from botorch.test_functions.synthetic import Branin
 from torch import Tensor
 from typing import Callable, Optional
@@ -81,22 +82,36 @@ class Function:
         """
         func_map = {
             "branincurrin": lambda: BraninCurrin(negate=True),
-            "dtlz1": lambda: DTLZ1(self.dim, num_objectives=self.nobj, negate=True),
-            "dtlz2": lambda: DTLZ2(self.dim, num_objectives=self.nobj, negate=True),
-            "dtlz3": lambda: DTLZ3(self.dim, num_objectives=self.nobj),
-            "dtlz7": lambda: DTLZ7(self.dim, num_objectives=self.nobj, negate=True),
-            "dh1": lambda: DH1(self.dim, negate=True),
-            "gmm": lambda: GMM(self.nobj, negate=True),
+            "dtlz1": lambda: DTLZ1(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "dtlz2": lambda: DTLZ2(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "c2dtlz2": lambda: C2DTLZ2(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "dtlz3": lambda: DTLZ3(dim=self.dim, num_objectives=self.nobj, negate=False),
+            "dtlz4": lambda: DTLZ4(dim=self.dim, num_objectives=self.nobj, negate=False),
+            "dtlz5": lambda: DTLZ5(dim=self.dim, num_objectives=self.nobj, negate=False),
+            "dtlz7": lambda: DTLZ7(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "dh1": lambda: DH1(dim=self.dim, negate=True),
+            "dh2": lambda: DH2(dim=self.dim, negate=True),
+            "dh3": lambda: DH3(dim=self.dim, negate=True),
+            "dh4": lambda: DH4(dim=self.dim, negate=True),
+            "gmm": lambda: GMM(num_objectives=self.nobj, negate=True),
             "penicillin": lambda: Penicillin(negate=True),
             "vehicle": lambda: VehicleSafety(negate=True),
             "carside": lambda: CarSideImpact(negate=True),
             "zdt3": lambda: ZDT3(dim=self.dim, num_objectives=self.nobj, negate=True),
+            "zdt2": lambda: ZDT2(dim=self.dim, num_objectives=self.nobj, negate=False),
+            "zdt1": lambda: ZDT1(dim=self.dim, num_objectives=self.nobj, negate=False),
             "constrainedbc": lambda: ConstrainedBraninCurrin(negate=True),
-            "discbrake": lambda: DiscBrake(),
+            "discbrake": lambda: DiscBrake(negate=True),
             "mw7": lambda: MW7(dim=self.dim, negate=True),
             "osy": lambda: OSY(negate=True),
             "weldedbeam": lambda: WeldedBeam(negate=True),
             "branin": lambda: Branin(negate=True),
+            "toyrobust": lambda: ToyRobust(negate=False),
+            "srn": lambda: SRN(negate=False),
+            "bnh": lambda: BNH(negate=False),
+            "constr": lambda: CONSTR(negate=True),
+            "mfcurrin": lambda: MultiFidelityCurrin(negate=False),
+            "mfforrester": lambda: MultiFidelityForrester(negate=True),
         }
 
         if self.name not in func_map:

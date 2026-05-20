@@ -22,11 +22,12 @@ def mock_gp():
     noise_std = 1e-6
 
     gps = ModelObject(
-        train_x=train_x, 
-        train_y=train_y, 
-        bounds=bounds, 
-        nobj=nobj, 
-        ncons=ncons, 
+        train_x=train_x,
+        train_y=train_y,
+        bounds=bounds,
+        nobj=nobj,
+        ncons=ncons,
+        ntrain=1,
         device=device,
         noise_std=noise_std)
     
@@ -36,16 +37,17 @@ def test_model_object_init():
     train_x = torch.tensor([[0.4, 0.2]])
     train_y = torch.tensor([[40., 24.]])
     bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
-    nobj, ncons, noise_std = 2, 2, 1e-6
+    nobj, ncons, ntrain, noise_std = 2, 2, 1, 1e-6
     device = torch.device("cpu")
 
-    gps = ModelObject(train_x, train_y, bounds, nobj, ncons, device, noise_std)
+    gps = ModelObject(train_x, train_y, bounds, nobj, ncons, ntrain, device, noise_std)
 
     assert torch.equal(gps.train_x, train_x)
     assert torch.equal(gps.train_y, train_y)
     assert torch.equal(gps.bounds, bounds)
     assert gps.nobj == nobj
     assert gps.ncons == ncons
+    assert gps.ntrain == ntrain
     assert gps.device == device
     assert gps.noise_std == noise_std
 
@@ -71,7 +73,7 @@ def test_model_predictions(mock_gp):
 
 def test_no_objectives():
     with pytest.raises(IndexError):
-        gps = ModelObject(torch.rand(1, 2), torch.rand(1, 0), torch.rand(2, 2), nobj=0, ncons=0, device="cpu")
+        gps = ModelObject(torch.rand(1, 2), torch.rand(1, 0), torch.rand(2, 2), nobj=0, ncons=0, ntrain=1, device="cpu")
         gps.fit_gp()
 
 

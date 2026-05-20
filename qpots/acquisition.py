@@ -1,14 +1,16 @@
 import torch
+import numpy as np
 from typing import Optional, Callable
 from torch import Tensor
 from scipy.spatial.distance import cdist
 from botorch.utils.transforms import normalize
 from botorch.models.model_list_gp_regression import ModelListGP
+from botorch.models import MultiTaskGP
 from botorch.acquisition.objective import GenericMCObjective
 from botorch.utils.sampling import draw_sobol_samples, sample_simplex
 from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
 from botorch.sampling.normal import SobolQMCNormalSampler
-from botorch.acquisition.multi_objective.parego import qLogNParEGO
+#from botorch.acquisition.multi_objective.parego import qLogNParEGO
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
 from botorch.acquisition.multi_objective.utils import (
@@ -27,7 +29,7 @@ from botorch.acquisition.multi_objective.joint_entropy_search import (
 )
 from botorch.optim.optimize import optimize_acqf, optimize_acqf_list
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from qpots.utils.utils import unstandardize, select_candidates
+from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_candidates, select_candidates_partial_info, select_candidates_total_correlation
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
@@ -215,6 +217,40 @@ class Acquisition:
 
         return -Ys
 
+    def _mt_gp_posterior(self, x: Tensor, gps: MultiTaskGP, seed_iter: int = 1) -> Tensor:
+        """
+        Compute posterior samples for PyMoo optimization for MultiTaskGP.
+
+        Parameters
+        ----------
+        x : Tensor
+            A tensor of input points for which posterior samples are computed.
+        gps : MultiTaskGP
+            A multi-task Gaussian Process model used to estimate the posterior distribution.
+        seed_iter : int, optional
+            An iteration index for seeding randomness in sampling. Defaults to 1.
+
+        Returns
+        -------
+        Tensor
+            A tensor containing posterior samples from the GP models, with
+            infeasible points penalized if constraints exist.
+        """
+        torch.manual_seed(1024 + seed_iter)
+
+        model=gps.models[0]
+        #Do not need appending of task IDS for posterior sampling:
+        Ys_=model.posterior(normalize(x,gps.bounds)).sample() #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
+        Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
+        
+        if self.ncons > 0:
+            ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
+            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
+            Ys = Ys_[..., : self.nobj]
+        else:
+            Ys = Ys_
+        return -Ys
+
     def qpots(
         self,
         bounds: Tensor,
@@ -235,17 +271,22 @@ class Acquisition:
             Additional arguments for customization, including:
             
             - ``nystrom`` (int): Whether to use the Nystrom approximation (1 for yes, 0 for no).
-            - ``iters`` (int): Number of iterations for approximation.
+            - ``iters`` (int): Number of iterations used in the Nystrom approximation.
             - ``nychoice`` (str): Column selection method for the Nystrom approximation.
-            - ``dim`` (int): Dimensionality of the problem.
-            - ``ngen`` (int): Number of generations for NSGA-II optimization.
+            - ``dim`` (int): Dimensionality of the input space.
+            - ``ngen`` (int): Number of generations for the NSGA-II optimization.
             - ``q`` (int): Number of candidates to select.
+            - ``mt`` (int): Whether to use MultiTaskGP for posterior sampling (1 for yes, 0 for no).
+            - ``partial_info`` (int): Whether to perform candidate selection using partial information (1 for yes, 0 for no).
+            - ``variance_threshold`` (float, optional): Variance threshold used during partial-information selection.
 
         Returns
         -------
-        Tensor
-            A tensor containing the selected candidate points after Pareto Optimal 
-            Thompson Sampling.
+        Tensor or Tuple[Tensor, Tensor]
+            - If ``partial_info == 0``: A normalized tensor of selected candidate points after Pareto Optimal 
+            Thompson Sampling..
+            - If ``partial_info == 1``: A tuple containing the normalized candidates and their
+            corresponding task IDs, ``(candidates, task_ids)``.
         """
         def track_pareto(res):
             pareto_set[0] = res.opt.get("X")
@@ -277,9 +318,15 @@ class Acquisition:
                 callback=track_pareto,
             )
         else:
-            gp_posterior_ = lambda x: self._gp_posterior(
-                x.to(self.device), self.gps, seed_iter=iteration
-            )
+            
+            if kwargs["mt"] == 1:
+                gp_posterior_ = lambda x: self._mt_gp_posterior(
+                    x.to(self.device), self.gps, seed_iter=iteration
+                )
+            else:
+                gp_posterior_ = lambda x: self._gp_posterior(
+                    x.to(self.device), self.gps, seed_iter=iteration
+                )
             pymoo_func_gp = PyMooFunction(
                 gp_posterior_,
                 n_var=kwargs["dim"],
@@ -287,16 +334,24 @@ class Acquisition:
                 xl=bounds[0].detach().cpu().numpy(),
                 xu=bounds[1].detach().cpu().numpy(),
             )
+
             res = nsga2(
                 pymoo_func_gp,
                 ngen=kwargs["ngen"],
-                pop_size=100 * kwargs["dim"],
+                pop_size=100 * kwargs["dim"] ,
                 seed=2430,
             )
         
-        selected_candidates = select_candidates(
-            self.gps, res.X, self.device, q=kwargs["q"], seed=2043
-        )
+        if kwargs["partial_info"] == 1:
+            #12/31 Now using total_correlation for candidate selection
+            selected_candidates, new_task_ids = select_candidates_total_correlation(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs["threshold"]
+            )
+            return normalize(selected_candidates, bounds), new_task_ids
+        else:
+            selected_candidates = select_candidates(
+                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
+            )
         
         return normalize(selected_candidates, bounds)
 

@@ -87,7 +87,7 @@ def test_gp_posterior(mock_gp_no_cons, mock_func):
     # Create Acquisition instance
     acquisition = Acquisition(func=mock_func, gps=mock_gp_no_cons)
     x = torch.tensor([[0.5, 0.5], [0.3, 0.7]])
-    result = acquisition.gp_posterior(x, mock_gp_no_cons)
+    result = acquisition._gp_posterior(x, mock_gp_no_cons)
 
     # Assertions
     assert isinstance(result, torch.Tensor), "Output is not a tensor"
@@ -127,7 +127,7 @@ def test_gp_posterior_with_constraints():
     x = torch.tensor([[0.5, 0.5], [0.3, 0.7]])
 
     # Test gp_posterior
-    result = acquisition.gp_posterior(x, gps)
+    result = acquisition._gp_posterior(x, gps)
 
     # Assertions
     assert isinstance(result, torch.Tensor), "Output is not a tensor"
@@ -149,7 +149,7 @@ def test_qpots(mock_func, real_func, q):
 
     train_x = torch.rand(pop_size, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=pop_size, device=torch.device("cpu"))
     gps.fit_gp()
     acq = Acquisition(func=mock_func, gps=gps, q=q)
 
@@ -157,6 +157,8 @@ def test_qpots(mock_func, real_func, q):
     iteration = 1
     kwargs = {
         "nystrom": 0,
+        "mt": 0,
+        "partial_info": 0,
         "iters": 10,
         "dim": 2,
         "nychoice": "random",
@@ -174,14 +176,16 @@ def test_qpots_nystrom(real_func, q):
 
     train_x = torch.rand(pop_size, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=pop_size, device=torch.device("cpu"))
     gps.fit_gp()
-    acq = Acquisition(func=mock_func, gps=gps, q=q)
+    acq = Acquisition(func=real_func, gps=gps, q=q)
 
     bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
     iteration = 1
     kwargs = {
         "nystrom": 1,
+        "mt": 0,
+        "partial_info": 0,
         "iters": 10,
         "dim": 2,
         "nychoice": "random",
@@ -191,7 +195,7 @@ def test_qpots_nystrom(real_func, q):
     res = acq.qpots(bounds, iteration, **kwargs)
 
     assert isinstance(res, torch.Tensor), "Output is not a Tensor"
-    assert res.shape == torch.Size([q, 2])    
+    assert res.shape == torch.Size([q, 2])
 
 @pytest.mark.parametrize("q", [1, 2, 3, 4])
 def test_qlogei(real_func, q):
@@ -199,7 +203,7 @@ def test_qlogei(real_func, q):
     train_y = real_func.evaluate(train_x)
 
     # Create GPs for each objective
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=5, device=torch.device("cpu"))
     gps.fit_gp()
 
     # Create Acquisition instance
@@ -222,7 +226,7 @@ def test_parego(real_func, q):
     train_x = torch.rand(5, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
 
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=5, device=torch.device("cpu"))
     gps.fit_gp()
 
     acquisition = Acquisition(func=real_func, gps=gps, q=q)
@@ -239,7 +243,7 @@ def test_qlogparego(real_func, q):
     train_x = torch.rand(5, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
 
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=5, device=torch.device("cpu"))
     gps.fit_gp()
 
     acquisition = Acquisition(func=real_func, gps=gps, q=q)
@@ -256,7 +260,7 @@ def test_pesmo(real_func, q):
     train_x = torch.rand(100, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
 
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=100, device=torch.device("cpu"))
     gps.fit_gp()
 
     acquisition = Acquisition(func=real_func, gps=gps, q=q)
@@ -273,7 +277,7 @@ def test_mesmo(real_func, q):
     train_x = torch.rand(100, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
 
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=100, device=torch.device("cpu"))
     gps.fit_gp()
 
     acquisition = Acquisition(func=real_func, gps=gps, q=q)
@@ -290,7 +294,7 @@ def test_jesmo(real_func, q):
     train_x = torch.rand(100, real_func.dim, dtype=torch.float64)
     train_y = real_func.evaluate(train_x)
 
-    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, device=torch.device("cpu"))
+    gps = ModelObject(train_x=train_x, train_y=train_y, bounds=real_func.get_bounds(), nobj=real_func.nobj, ncons=0, ntrain=100, device=torch.device("cpu"))
     gps.fit_gp_no_variance()
 
     acquisition = Acquisition(func=real_func, gps=gps, q=q)
