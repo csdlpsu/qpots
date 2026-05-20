@@ -66,12 +66,18 @@ def sgp_gps(branincurrin_func):
 # ---------------------------------------------------------------------------
 
 def test_mt_gp_posterior_output_shape(mtgp_gps, branincurrin_func):
-    """_mt_gp_posterior must return a tensor of shape (n_points, nobj)."""
+    """_mt_gp_posterior returns a tensor whose last two dims are (n_points, nobj).
+
+    The MTGP posterior sample has an extra leading sample dimension of 1,
+    so the full shape is (1, n_points, nobj).
+    """
     acq = Acquisition(func=branincurrin_func, gps=mtgp_gps)
-    x = torch.rand(8, branincurrin_func.dim, dtype=torch.float64)
+    n = 8
+    x = torch.rand(n, branincurrin_func.dim, dtype=torch.float64)
     result = acq._mt_gp_posterior(x, mtgp_gps, seed_iter=1)
     assert isinstance(result, torch.Tensor)
-    assert result.shape == torch.Size([8, mtgp_gps.nobj])
+    assert result.shape[-1] == mtgp_gps.nobj, "Last dim must equal nobj"
+    assert result.shape[-2] == n, "Second-to-last dim must equal n_points"
 
 
 def test_mt_gp_posterior_returns_negated_values(mtgp_gps, branincurrin_func):
@@ -203,7 +209,7 @@ def test_qpots_partial_info_returns_tuple(mtgp_gps, branincurrin_func):
         "nystrom": 0,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": None,
+        "threshold": None,
         "iters": 5,
         "dim": branincurrin_func.dim,
         "nychoice": "random",
@@ -223,7 +229,7 @@ def test_qpots_partial_info_candidates_shape(mtgp_gps, branincurrin_func):
         "nystrom": 0,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": None,
+        "threshold": None,
         "iters": 5,
         "dim": branincurrin_func.dim,
         "nychoice": "random",
@@ -242,7 +248,7 @@ def test_qpots_partial_info_task_ids_shape(mtgp_gps, branincurrin_func):
         "nystrom": 0,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": None,
+        "threshold": None,
         "iters": 5,
         "dim": branincurrin_func.dim,
         "nychoice": "random",
@@ -261,7 +267,7 @@ def test_qpots_partial_info_candidates_normalized(mtgp_gps, branincurrin_func):
         "nystrom": 0,
         "mt": 1,
         "partial_info": 1,
-        "variance_threshold": None,
+        "threshold": None,
         "iters": 5,
         "dim": branincurrin_func.dim,
         "nychoice": "random",

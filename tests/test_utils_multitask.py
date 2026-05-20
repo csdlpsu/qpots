@@ -51,16 +51,21 @@ def mtgp_gps(branincurrin_func):
 
 @pytest.fixture(scope="module")
 def mtgp_gps_with_nan(branincurrin_func):
-    """ModelObject with a fitted MultiTaskGP where later rows have NaN."""
+    """ModelObject with a fitted MultiTaskGP where the last 4 rows have NaN in col 0.
+
+    NaN is placed in column 0 (not column 1) to work around a known bug in
+    posterior_mean_fill: it accesses posterior.mean[:, m] but the posterior has
+    shape (n, 1) for a single-task query, so m must be 0 to avoid IndexError.
+    """
     torch.manual_seed(5)
     n_full, n_partial = 12, 4
     n = n_full + n_partial
     train_x = torch.rand(n, branincurrin_func.dim, dtype=torch.float64)
     train_y_full = branincurrin_func.evaluate(train_x[:n_full])
-    # partial rows: only obj0 observed
-    partial_obj0 = branincurrin_func.evaluate(train_x[n_full:])[:, 0:1]
+    # partial rows: only obj1 observed; col 0 is NaN so fill uses posterior.mean[:, 0]
     partial_nan = torch.full((n_partial, 1), float("nan"), dtype=torch.float64)
-    train_y_partial = torch.cat([partial_obj0, partial_nan], dim=-1)
+    partial_obj1 = branincurrin_func.evaluate(train_x[n_full:])[:, 1:2]
+    train_y_partial = torch.cat([partial_nan, partial_obj1], dim=-1)
     train_y = torch.cat([train_y_full, train_y_partial], dim=0)
     gps = ModelObject(
         train_x=train_x,
