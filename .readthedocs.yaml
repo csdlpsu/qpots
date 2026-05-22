@@ -10,8 +10,10 @@ build:
 sphinx:
   configuration: docs/source/conf.py
 
-# Install Python dependencies
+# Install qPOTS and the documentation dependencies from the checked-out source.
 python:
   install:
-    - requirements: requirements.txt
-
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
