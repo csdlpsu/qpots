@@ -203,8 +203,7 @@ Clone the repository and install the package in editable mode with the test depe
 ```bash
 git clone https://github.com/csdlpsu/qpots
 cd qpots
-pip install -e .
-pip install -r tests/requirements.txt
+python -m pip install -e ".[test,docs]"
 ```
 
 Run the test suite with:
@@ -214,6 +213,14 @@ pytest
 ```
 
 The package source lives in [`qpots/`](qpots/), examples live in [`examples/`](examples/), tests live in [`tests/`](tests/), and Sphinx documentation lives in [`docs/`](docs/).
+
+## Contributing And Support
+
+Contributions, bug reports, documentation improvements, and research-use questions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+Use the [GitHub issue tracker](https://github.com/csdlpsu/qpots/issues) to report bugs, request features, ask usage questions, or seek support. For bug reports, include your qPOTS version, Python version, operating system, relevant dependency versions, CPU/GPU context, and a minimal reproducible example when possible.
+
+qPOTS is maintained by the Computational Complex Engineered Systems Design Laboratory at Penn State. Maintainer response times may vary with academic schedules, but issues with reproducible examples and clear research context are easiest to triage.
 
 ## License
 
