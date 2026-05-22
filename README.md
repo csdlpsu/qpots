@@ -11,7 +11,7 @@
   <a href="https://pypi.org/project/qpots/"><img alt="PyPI" src="https://img.shields.io/pypi/v/qpots"></a>
   <a href="https://qpots-batch-pareto-optimal-thompson-sampling.readthedocs.io/en/latest/"><img alt="Documentation" src="https://img.shields.io/readthedocs/qpots-batch-pareto-optimal-thompson-sampling"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green"></a>
-  <img alt="Python versions" src="https://img.shields.io/badge/python-%3E%3D3.10-blue">
+  <img alt="Python versions" src="https://img.shields.io/badge/python-3.10%20%7C%203.11-blue">
 </p>
 
 $q\texttt{POTS}$ is a Python package for sample-efficient multiobjective Bayesian optimization. It implements **Pareto Optimal Thompson Sampling**, a batch acquisition strategy that selects candidates according to their probability of being Pareto optimal under Gaussian-process posterior samples.
@@ -46,7 +46,7 @@ cd qpots
 pip install .
 ```
 
-$q\texttt{POTS}$ requires Python 3.10 or newer. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, and pymoo.
+$q\texttt{POTS}$ supports Python 3.10 and 3.11. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, scikit-learn, and pymoo.
 
 ### Optional MATLAB Engine
 
