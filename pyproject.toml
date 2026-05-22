@@ -5,12 +5,15 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.package-data]
 qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
 
+[tool.setuptools.exclude-package-data]
+qpots = ["**/__pycache__/*", "**/*.pyc", "TS-EMO/**/*.py~", "TS-EMO/**/*.m~"]
+
 [tool.setuptools.packages.find]
 include = ["qpots*"]
 
 [project]
 name = "qpots"
-version = "2.0.0"
+version = "2.0.1"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
