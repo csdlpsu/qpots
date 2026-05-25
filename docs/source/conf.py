@@ -36,6 +36,8 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'sphinx_rtd_theme'
+html_logo = '../../assets/qpots-logo.png'
+html_favicon = '../../assets/qpots-logo.png'
 html_theme_options = {
     "collapse_navigation": False,
     "navigation_depth": 3,

@@ -5,6 +5,12 @@
 
 qPOTS Documentation
 ===================
+
+.. image:: ../../assets/qpots-logo.png
+   :alt: qPOTS logo
+   :align: center
+   :width: 180px
+
 .. toctree::
    :maxdepth: 2
    :caption: Installation
