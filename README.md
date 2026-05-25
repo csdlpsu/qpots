@@ -163,6 +163,7 @@ For complete scripts, see:
 
 - [Unconstrained Branin](examples/unconstrained_branin.py)
 - [Constrained optimization](examples/constrained_example.py)
+- [Decoupled optimization (OSY)](examples/decoupled_osy_example.py)
 - [Custom objective functions](examples/custom_function_example.py)
 - [Multiple acquisition functions](examples/multiple_acquisitions_example.py)
 - [HPC-style runs](examples/hpc_example.py)

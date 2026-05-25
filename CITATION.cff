@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use qPOTS in your research, please cite the JOSS paper and the AISTATS qPOTS paper."
+title: "qPOTS: Batch Pareto optimal Thompson sampling for multiobjective Bayesian optimization"
+version: 2.0.1
+license: GPL-3.0-only
+repository-code: "https://github.com/csdlpsu/qpots"
+authors:
+  - family-names: Carlson
+    given-names: Kade E.
+  - family-names: Renganathan
+    given-names: Ashwin
+    orcid: "https://orcid.org/0000-0001-6948-6932"
+  - family-names: Bachman
+    given-names: Peter E.
+preferred-citation:
+  type: article
+  title: "qPOTS: Batch Pareto optimal Thompson sampling for multiobjective Bayesian optimization"
+  authors:
+    - family-names: Carlson
+      given-names: Kade E.
+    - family-names: Renganathan
+      given-names: Ashwin
+      orcid: "https://orcid.org/0000-0001-6948-6932"
+    - family-names: Bachman
+      given-names: Peter E.
+  journal: "Journal of Open Source Software"
+  year: 2026
