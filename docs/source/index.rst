@@ -32,3 +32,4 @@ qPOTS Documentation
 
    constrained_example
    unconstrained_example
+   decoupled_osy_example
