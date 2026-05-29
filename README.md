@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://proceedings.mlr.press/v258/renganathan25a.html"><img alt="AISTATS 2025 paper" src="https://img.shields.io/badge/Paper-AISTATS%202025-2563eb"></a>
-  <a href="https://pypi.org/project/qpots/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/qpots?label=PyPI"></a>
+  <a href="https://pypi.org/project/qpots/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/qpots?label=PyPI&cacheSeconds=60"></a>
   <a href="https://qpots.readthedocs.io/en/latest/"><img alt="Documentation" src="https://img.shields.io/readthedocs/qpots"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green"></a>
   <img alt="Python versions" src="https://img.shields.io/badge/python-3.10%20%7C%203.11-blue">
