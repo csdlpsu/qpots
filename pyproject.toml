@@ -6,7 +6,14 @@ build-backend = "setuptools.build_meta"
 qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
 
 [tool.setuptools.exclude-package-data]
-qpots = ["**/__pycache__/*", "**/*.pyc", "TS-EMO/**/*.py~", "TS-EMO/**/*.m~"]
+qpots = [
+    "**/__pycache__/*",
+    "**/*.pyc",
+    "TS-EMO/*.py~",
+    "TS-EMO/*.m~",
+    "TS-EMO/**/*.py~",
+    "TS-EMO/**/*.m~",
+]
 
 [tool.setuptools.packages.find]
 include = ["qpots*"]
