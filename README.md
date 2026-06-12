@@ -11,7 +11,7 @@
   <a href="https://pypi.org/project/qpots/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/qpots?label=PyPI&cacheSeconds=60"></a>
   <a href="https://qpots.readthedocs.io/en/latest/"><img alt="Documentation" src="https://img.shields.io/readthedocs/qpots"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green"></a>
-  <img alt="Python versions" src="https://img.shields.io/badge/python-3.10%20%7C%203.11-blue">
+  <a href="https://github.com/csdlpsu/qpots/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/csdlpsu/qpots/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 $q\texttt{POTS}$ is a Python package for sample-efficient multiobjective Bayesian optimization. It implements **Pareto Optimal Thompson Sampling**, a batch acquisition strategy that selects candidates according to their probability of being Pareto optimal under Gaussian-process posterior samples.
