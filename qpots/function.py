@@ -1,203 +1,203 @@
-from botorch.test_functions.multi_objective import (
-    BraninCurrin, DTLZ1, DTLZ2, DTLZ3, DTLZ4, DTLZ5, DTLZ7, GMM, DH1, DH2, DH3, DH4, Penicillin,
-    VehicleSafety, CarSideImpact, ConstrainedBraninCurrin,
-    ZDT1,ZDT2,ZDT3, DiscBrake, MW7, OSY, WeldedBeam, C2DTLZ2,ToyRobust,BNH,SRN,CONSTR
-)
-#from examples.Fall_25_custom_functions import MultiFidelityCurrin, MultiFidelityForrester #Extra Multi-Fidelity Test functions 9/29
-from botorch.test_functions.synthetic import Branin
-from torch import Tensor
-from typing import Callable, Optional
+"""Objective and constraint evaluation interfaces used by qPOTS."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
 import torch
+from torch import Tensor
+
+from qpots.benchmark_registry import create_benchmark
 from qpots.config import RuntimeConfig, resolve_runtime, to_runtime
 
 
-class Function:
-    """
-    Interface for multi-objective test functions.
+@dataclass(frozen=True)
+class EvaluationResult:
+    """Objectives and optional constraints observed at the same design points."""
 
-    This class provides an abstraction over BoTorch test functions and allows for 
-    user-defined objective functions. It supports retrieving function bounds and 
-    constraints when available.
+    objectives: Tensor
+    constraints: Tensor | None = None
+
+
+class Function:
+    """A reusable objective-function interface for qPOTS.
+
+    Bounds always have shape ``(2, dim)``: the first row contains lower bounds
+    and the second row contains upper bounds. Subclasses implement
+    :meth:`_evaluate`; callable-based users may continue to pass ``custom_func``.
     """
 
     def __init__(
         self,
-        name: Optional[str] = None,
+        name: str | None = None,
         dim: int = 2,
         nobj: int = 2,
-        custom_func: Optional[Callable[[Tensor], Tensor]] = None,
-        bounds: Optional[Tensor] = None,
-        cons: Optional[Callable[[Tensor], Tensor]] = None,
+        custom_func: Callable[[Tensor], Tensor] | None = None,
+        bounds: Tensor | None = None,
+        cons: Callable[[Tensor], Tensor] | None = None,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
         runtime: RuntimeConfig | None = None,
-    ):
-        """
-        Initialize a test function for multi-objective optimization.
+        combined_func: Callable[[Tensor], EvaluationResult] | None = None,
+    ) -> None:
+        if dim < 1:
+            raise ValueError("dim must be at least 1")
+        if nobj < 1:
+            raise ValueError("nobj must be at least 1")
+        if custom_func is not None and combined_func is not None:
+            raise ValueError("Pass either custom_func or combined_func, not both")
 
-        Parameters
-        ----------
-        name : str, optional
-            Name of the predefined test function (case-insensitive). 
-            If None, a custom function must be provided.
-        dim : int
-            Dimensionality of the input space. Defaults to 2.
-        nobj : int
-            Number of objectives for the test function. Defaults to 2.
-        custom_func : Callable, optional
-            A user-defined function that takes a tensor `X` as input and 
-            returns an output tensor. If provided, `name` is ignored.
-        bounds : Tensor, optional
-            A tensor specifying the lower and upper bounds for the function.
-            Required if using a custom function.
-        cons : Callable, optional
-            A constraint function that maps inputs to constraint values.
-        device : torch.device or str, optional
-            Device used for generated bounds and evaluations. Defaults to the
-            qPOTS runtime device.
-        dtype : torch.dtype, optional
-            Floating-point precision used for generated bounds and evaluations.
-            Defaults to ``qpots.config.DEFAULT_DTYPE``.
-
-        Raises
-        ------
-        ValueError
-            If a custom function is provided but `bounds` is not specified.
-            If an unknown function name is provided.
-        """
         self.name = name.lower() if name else None
         self.dim = dim
         self.nobj = nobj
-        resolved_runtime = resolve_runtime(runtime, device=device, dtype=dtype)
-        self.runtime = resolved_runtime
-        self.device = resolved_runtime.device
-        self.dtype = resolved_runtime.dtype
+        self.runtime = resolve_runtime(runtime, device=device, dtype=dtype)
+        self.device = self.runtime.device
+        self.dtype = self.runtime.dtype
         self.custom_func = custom_func
-        self.bounds = to_runtime(bounds, self.device, self.dtype) if torch.is_tensor(bounds) else bounds
+        self.combined_func = combined_func
         self.cons = cons
+        self.func: object | None = None
 
-        if self.custom_func:
-            if self.bounds is None:
+        uses_subclass_hook = type(self)._evaluate is not Function._evaluate
+        if custom_func is not None or combined_func is not None or uses_subclass_hook:
+            if bounds is None:
                 raise ValueError("Custom functions must specify bounds.")
-        else:
+            self.bounds = self._validate_bounds(bounds)
+        elif self.name is not None:
             self._initialize_function()
+        else:
+            raise ValueError("Provide a benchmark name, custom function, or _evaluate subclass")
 
-    def _initialize_function(self):
-        """
-        Initialize a predefined BoTorch test function.
+    def _validate_bounds(self, bounds: Tensor) -> Tensor:
+        if not torch.is_tensor(bounds):
+            raise TypeError("bounds must be a torch.Tensor with shape (2, dim)")
+        resolved = to_runtime(bounds, self.device, self.dtype)
+        if resolved.ndim != 2 or resolved.shape != (2, self.dim):
+            raise ValueError(
+                f"bounds must have shape (2, {self.dim}); got {tuple(resolved.shape)}"
+            )
+        if not torch.isfinite(resolved).all():
+            raise ValueError("bounds must contain only finite values")
+        if not torch.all(resolved[0] < resolved[1]):
+            raise ValueError("every lower bound must be strictly less than its upper bound")
+        return resolved
 
-        This method sets up the corresponding function, bounds, and constraints 
-        based on the selected function name.
-
-        Raises
-        ------
-        ValueError
-            If the specified function name is not recognized.
-        """
-        func_map = {
-            "branincurrin": lambda: BraninCurrin(negate=True),
-            "dtlz1": lambda: DTLZ1(dim=self.dim, num_objectives=self.nobj, negate=True),
-            "dtlz2": lambda: DTLZ2(dim=self.dim, num_objectives=self.nobj, negate=True),
-            "c2dtlz2": lambda: C2DTLZ2(dim=self.dim, num_objectives=self.nobj, negate=True),
-            "dtlz3": lambda: DTLZ3(dim=self.dim, num_objectives=self.nobj, negate=False),
-            "dtlz4": lambda: DTLZ4(dim=self.dim, num_objectives=self.nobj, negate=False),
-            "dtlz5": lambda: DTLZ5(dim=self.dim, num_objectives=self.nobj, negate=False),
-            "dtlz7": lambda: DTLZ7(dim=self.dim, num_objectives=self.nobj, negate=True),
-            "dh1": lambda: DH1(dim=self.dim, negate=True),
-            "dh2": lambda: DH2(dim=self.dim, negate=True),
-            "dh3": lambda: DH3(dim=self.dim, negate=True),
-            "dh4": lambda: DH4(dim=self.dim, negate=True),
-            "gmm": lambda: GMM(num_objectives=self.nobj, negate=True),
-            "penicillin": lambda: Penicillin(negate=True),
-            "vehicle": lambda: VehicleSafety(negate=True),
-            "carside": lambda: CarSideImpact(negate=True),
-            "zdt3": lambda: ZDT3(dim=self.dim, num_objectives=self.nobj, negate=True),
-            "zdt2": lambda: ZDT2(dim=self.dim, num_objectives=self.nobj, negate=False),
-            "zdt1": lambda: ZDT1(dim=self.dim, num_objectives=self.nobj, negate=False),
-            "constrainedbc": lambda: ConstrainedBraninCurrin(negate=True),
-            "discbrake": lambda: DiscBrake(negate=True),
-            "mw7": lambda: MW7(dim=self.dim, negate=True),
-            "osy": lambda: OSY(negate=True),
-            "weldedbeam": lambda: WeldedBeam(negate=True),
-            "branin": lambda: Branin(negate=True),
-            "toyrobust": lambda: ToyRobust(negate=False),
-            "srn": lambda: SRN(negate=False),
-            "bnh": lambda: BNH(negate=False),
-            "constr": lambda: CONSTR(negate=True),
-            "mfcurrin": lambda: MultiFidelityCurrin(negate=False),
-            "mfforrester": lambda: MultiFidelityForrester(negate=True),
-        }
-
-        if self.name not in func_map:
-            raise ValueError(f"Unknown test function '{self.name}'. Check the available functions.")
-
-        # Initialize function, bounds, and constraints
-        self.func = func_map[self.name]()
+    def _initialize_function(self) -> None:
+        self.func = create_benchmark(self.name or "", dim=self.dim, nobj=self.nobj)
         if hasattr(self.func, "to"):
             self.func = self.func.to(device=self.device, dtype=self.dtype)
-        self.bounds = self.func.bounds.to(device=self.device, dtype=self.dtype)
+        self.bounds = self._validate_bounds(self.func.bounds)
         if hasattr(self.func, "evaluate_slack"):
-            self.cons = self._evaluate_constraints
+            self.cons = self._evaluate_builtin_constraints
 
-    def _evaluate_constraints(self, X: Tensor) -> Tensor:
-        """Evaluate BoTorch constraint slack values on the runtime device/dtype."""
-        X = X.to(device=self.device, dtype=self.dtype)
+    def _coerce_input(self, X: Tensor) -> Tensor:
+        if not torch.is_tensor(X):
+            raise TypeError("X must be a torch.Tensor")
+        resolved = to_runtime(X, self.device, self.dtype)
+        if resolved.ndim == 0 or resolved.shape[-1] != self.dim:
+            raise ValueError(f"X must have final dimension {self.dim}")
+        return resolved
+
+    def _coerce_output(self, output: Tensor, X: Tensor, columns: int, label: str) -> Tensor:
+        if not torch.is_tensor(output):
+            raise TypeError(f"{label} output must be a torch.Tensor")
+        resolved = to_runtime(output, self.device, self.dtype)
+        if columns == 1 and resolved.shape == X.shape[:-1]:
+            resolved = resolved.unsqueeze(-1)
+        expected_shape = (*X.shape[:-1], columns)
+        if resolved.shape != expected_shape:
+            raise ValueError(
+                f"{label} output must have shape {expected_shape}; got {tuple(resolved.shape)}"
+            )
+        return resolved
+
+    def _evaluate(self, X: Tensor) -> Tensor:
+        """Evaluate objectives; subclasses override this method."""
+        if self.custom_func is not None:
+            return self.custom_func(X)
+        if self.combined_func is not None:
+            return self._call_combined(X).objectives
+        if self.func is None:
+            raise NotImplementedError("Subclasses must implement _evaluate")
         try:
-            result = self.func.evaluate_slack(X)
-        except ValueError as err:
-            if "within the bounds" not in str(err) or not torch.is_tensor(self.bounds):
-                raise
-            X_eval = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
-            result = self.func.evaluate_slack(X_eval)
-        return result.to(device=self.device, dtype=self.dtype)
-
-    def evaluate(self, X: Tensor) -> Tensor:
-        """
-        Evaluate the test function or custom function on input `X`.
-
-        Parameters
-        ----------
-        X : Tensor
-            A tensor of shape `(n, dim)`, where `n` is the number of points and `dim` is the input dimension.
-
-        Returns
-        -------
-        Tensor
-            A tensor of shape `(n, nobj)` containing the function outputs.
-        """
-        X = X.to(device=self.device, dtype=self.dtype)
-        if self.custom_func:
-            return self.custom_func(X).to(device=self.device, dtype=self.dtype)
-        try:
-            result = self.func(X)
+            return self.func(X)
         except ValueError as err:
             if "within the bounds" not in str(err) or not hasattr(self.func, "evaluate_true"):
                 raise
-            if torch.is_tensor(self.bounds):
-                X_eval = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
-                result = self.func(X_eval)
-            else:
+            normalized_input = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
+            return self.func(normalized_input)
+
+    def _evaluate_builtin_constraints(self, X: Tensor) -> Tensor:
+        X = self._coerce_input(X)
+        try:
+            return self.func.evaluate_slack(X)
+        except ValueError as err:
+            if "within the bounds" not in str(err):
                 raise
-        return result.to(device=self.device, dtype=self.dtype)
+            physical_input = self.bounds[0] + X * (self.bounds[1] - self.bounds[0])
+            return self.func.evaluate_slack(physical_input)
+
+    def _call_combined(self, X: Tensor) -> EvaluationResult:
+        result = self.combined_func(X)
+        if not isinstance(result, EvaluationResult):
+            raise TypeError("combined_func must return an EvaluationResult")
+        return result
+
+    def evaluate(self, X: Tensor) -> Tensor:
+        """Return objective values with shape ``X.shape[:-1] + (nobj,)``."""
+        resolved_input = self._coerce_input(X)
+        output = self._evaluate(resolved_input)
+        return self._coerce_output(output, resolved_input, self.nobj, "objective")
+
+    def evaluate_all(self, X: Tensor) -> EvaluationResult:
+        """Evaluate objectives and constraints together when they are available."""
+        resolved_input = self._coerce_input(X)
+        if self.combined_func is not None:
+            raw_result = self._call_combined(resolved_input)
+            objectives = self._coerce_output(
+                raw_result.objectives, resolved_input, self.nobj, "objective"
+            )
+            constraints = raw_result.constraints
+            if constraints is not None:
+                constraints = self._coerce_constraint_output(constraints, resolved_input)
+            return EvaluationResult(objectives, constraints)
+
+        objectives = self._coerce_output(
+            self._evaluate(resolved_input), resolved_input, self.nobj, "objective"
+        )
+        constraint_func = self.get_cons()
+        constraints = constraint_func(resolved_input) if constraint_func is not None else None
+        return EvaluationResult(objectives, constraints)
+
+    def _coerce_constraint_output(self, output: Tensor, X: Tensor) -> Tensor:
+        if not torch.is_tensor(output):
+            raise TypeError("constraint output must be a torch.Tensor")
+        resolved = to_runtime(output, self.device, self.dtype)
+        if resolved.shape[:-1] != X.shape[:-1]:
+            raise ValueError("constraint output batch shape must match X")
+        return resolved
 
     def get_bounds(self) -> Tensor:
-        """
-        Retrieve the bounds for the function.
-
-        Returns
-        -------
-        Tensor
-            A tensor containing the lower and upper bounds for each input dimension.
-        """
+        """Return bounds with shape ``(2, dim)``."""
         return self.bounds
 
-    def get_cons(self) -> Optional[Callable]:
-        """
-        Retrieve the constraint function for the test function.
+    def get_cons(self) -> Callable[[Tensor], Tensor] | None:
+        """Return the separate constraint callable, if one is available."""
+        if self.combined_func is not None:
+            def combined_constraints(X: Tensor) -> Tensor:
+                resolved_input = self._coerce_input(X)
+                constraints = self._call_combined(resolved_input).constraints
+                if constraints is None:
+                    raise ValueError("combined_func did not return constraints")
+                return self._coerce_constraint_output(constraints, resolved_input)
 
-        Returns
-        -------
-        Callable or None
-            The constraint function if available; otherwise, None.
-        """
-        return self.cons
+            return combined_constraints
+        if self.cons is None:
+            return None
+
+        def constraints(X: Tensor) -> Tensor:
+            resolved_input = self._coerce_input(X)
+            return self._coerce_constraint_output(self.cons(resolved_input), resolved_input)
+
+        return constraints

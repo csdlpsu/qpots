@@ -9,6 +9,8 @@ from qpots.config import (
     get_default_runtime,
     set_default_runtime,
 )
+from qpots.benchmark_registry import available_benchmarks, create_benchmark
+from qpots.function import EvaluationResult, Function
 
 __all__ = [
     "DEFAULT_DEVICE",
@@ -16,4 +18,8 @@ __all__ = [
     "RuntimeConfig",
     "get_default_runtime",
     "set_default_runtime",
+    "EvaluationResult",
+    "Function",
+    "available_benchmarks",
+    "create_benchmark",
 ]

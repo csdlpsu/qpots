@@ -9,7 +9,8 @@ warnings.filterwarnings('ignore')
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from botorch.test_functions.multi_objective import BraninCurrin, OSY
-from qpots.function import Function
+from qpots.benchmark_registry import available_benchmarks, create_benchmark
+from qpots.function import EvaluationResult, Function
 
 @pytest.fixture()
 def mock_func():
@@ -34,8 +35,8 @@ def test_function_init(mock_func):
     name = mock_func.name 
     dim = mock_func.dim
     nobj = mock_func.nobj
-    custom_func = mock_func.custom_func
-    bounds = mock_func.bounds
+    custom_func = lambda x: torch.column_stack((x[:, 0], x[:, 1]))
+    bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
     cons = mock_func.cons
 
     f = Function(
@@ -51,7 +52,7 @@ def test_function_init(mock_func):
     assert f.dim == dim
     assert f.nobj == nobj
     assert f.custom_func == custom_func
-    assert f.bounds == bounds
+    assert torch.equal(f.bounds, bounds.to(dtype=torch.float64))
     assert f.cons == cons
 
 def test_func_map_properly_initialized():
@@ -206,3 +207,81 @@ def test_constrained_function_evaluate_returns_only_objectives():
     )
     cons_res = obj.get_cons()(x)
     assert isinstance(cons_res, torch.Tensor)
+
+
+def test_registry_helpers():
+    assert "branincurrin" in available_benchmarks()
+    assert isinstance(create_benchmark("BraninCurrin", dim=2, nobj=2), BraninCurrin)
+    with pytest.raises(ValueError, match="Unknown test function"):
+        create_benchmark("missing", dim=2, nobj=2)
+
+
+def test_bounds_shape_and_values_are_validated(custom_function):
+    with pytest.raises(ValueError, match=r"shape \(2, 3\)"):
+        Function(dim=3, nobj=2, custom_func=custom_function, bounds=torch.zeros(3, 2))
+    with pytest.raises(ValueError, match="strictly less"):
+        Function(dim=2, nobj=2, custom_func=custom_function, bounds=torch.ones(2, 2))
+    invalid = torch.tensor([[0.0, 0.0], [1.0, float("inf")]])
+    with pytest.raises(ValueError, match="finite"):
+        Function(dim=2, nobj=2, custom_func=custom_function, bounds=invalid)
+
+
+def test_function_can_be_subclassed():
+    class QuadraticFunction(Function):
+        def _evaluate(self, X):
+            return torch.column_stack((X[:, 0] ** 2, X[:, 0] + 1))
+
+    function = QuadraticFunction(
+        dim=1,
+        nobj=2,
+        bounds=torch.tensor([[0.0], [2.0]]),
+    )
+    result = function.evaluate(torch.tensor([[0.5]]))
+    assert torch.allclose(result, torch.tensor([[0.25, 1.5]], dtype=torch.float64))
+
+
+def test_combined_evaluation_returns_objectives_and_constraints():
+    calls = 0
+
+    def combined(X):
+        nonlocal calls
+        calls += 1
+        return EvaluationResult(
+            objectives=torch.column_stack((X[:, 0], -X[:, 0])),
+            constraints=(X[:, :1] - 0.5),
+        )
+
+    function = Function(
+        dim=1,
+        nobj=2,
+        bounds=torch.tensor([[0.0], [1.0]]),
+        combined_func=combined,
+    )
+    result = function.evaluate_all(torch.tensor([[0.25], [0.75]]))
+    assert calls == 1
+    assert result.objectives.shape == (2, 2)
+    assert result.constraints.shape == (2, 1)
+
+
+def test_separate_evaluation_returns_objectives_and_constraints():
+    function = Function(
+        dim=1,
+        nobj=2,
+        bounds=torch.tensor([[0.0], [1.0]]),
+        custom_func=lambda X: torch.column_stack((X[:, 0], -X[:, 0])),
+        cons=lambda X: X[:, :1] - 0.5,
+    )
+    result = function.evaluate_all(torch.tensor([[0.25], [0.75]]))
+    assert result.objectives.shape == (2, 2)
+    assert result.constraints.shape == (2, 1)
+
+
+def test_evaluation_output_shape_is_validated():
+    function = Function(
+        dim=1,
+        nobj=2,
+        bounds=torch.tensor([[0.0], [1.0]]),
+        custom_func=lambda X: X[:, :1],
+    )
+    with pytest.raises(ValueError, match="objective output must have shape"):
+        function.evaluate(torch.tensor([[0.5]]))
