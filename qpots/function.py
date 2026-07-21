@@ -8,7 +8,7 @@ from botorch.test_functions.synthetic import Branin
 from torch import Tensor
 from typing import Callable, Optional
 import torch
-from qpots.config import get_device, get_dtype, to_runtime
+from qpots.config import RuntimeConfig, resolve_runtime, to_runtime
 
 
 class Function:
@@ -30,6 +30,7 @@ class Function:
         cons: Optional[Callable[[Tensor], Tensor]] = None,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
+        runtime: RuntimeConfig | None = None,
     ):
         """
         Initialize a test function for multi-objective optimization.
@@ -67,8 +68,10 @@ class Function:
         self.name = name.lower() if name else None
         self.dim = dim
         self.nobj = nobj
-        self.device = get_device(device)
-        self.dtype = get_dtype(dtype)
+        resolved_runtime = resolve_runtime(runtime, device=device, dtype=dtype)
+        self.runtime = resolved_runtime
+        self.device = resolved_runtime.device
+        self.dtype = resolved_runtime.dtype
         self.custom_func = custom_func
         self.bounds = to_runtime(bounds, self.device, self.dtype) if torch.is_tensor(bounds) else bounds
         self.cons = cons

@@ -8,7 +8,7 @@ from gpytorch.kernels import ScaleKernel, MaternKernel
 from botorch.models.transforms.outcome import Standardize
 from botorch.exceptions.errors import ModelFittingError
 from gpytorch.priors import GammaPrior
-from qpots.config import get_device, get_dtype, tensor_kwargs, to_runtime
+from qpots.config import RuntimeConfig, resolve_runtime, tensor_kwargs, to_runtime
 
 
 class ModelObject:
@@ -31,6 +31,7 @@ class ModelObject:
         device: str | torch.device | None = None, 
         noise_std: float = 1e-6,
         dtype: torch.dtype | None = None,
+        runtime: RuntimeConfig | None = None,
         
         
     ):
@@ -62,8 +63,10 @@ class ModelObject:
             Floating-point precision. If omitted, qPOTS uses
             ``qpots.config.DEFAULT_DTYPE``.
         """
-        self.device = get_device(device)
-        self.dtype = get_dtype(dtype)
+        resolved_runtime = resolve_runtime(runtime, device=device, dtype=dtype)
+        self.runtime = resolved_runtime
+        self.device = resolved_runtime.device
+        self.dtype = resolved_runtime.dtype
         self.tkwargs = tensor_kwargs(device=self.device, dtype=self.dtype)
         self.train_x = to_runtime(train_x, self.device, self.dtype)
         self.train_y = to_runtime(train_y, self.device, self.dtype)

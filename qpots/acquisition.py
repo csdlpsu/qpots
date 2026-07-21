@@ -34,7 +34,7 @@ from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_ca
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
-from qpots.config import as_tensor, get_device, get_dtype, tensor_kwargs, to_runtime
+from qpots.config import RuntimeConfig, as_tensor, resolve_runtime, tensor_kwargs, to_runtime
 
 
 class Acquisition:
@@ -51,7 +51,8 @@ class Acquisition:
         dtype: torch.dtype | None = None,
         q: int = 1,
         NUM_RESTARTS: int = 10,
-        RAW_SAMPLES: int = 512
+        RAW_SAMPLES: int = 512,
+        runtime: RuntimeConfig | None = None,
     ) -> None:
         """
         Initialize the multi-objective acquisition class.
@@ -88,9 +89,19 @@ class Acquisition:
         self.gps = gps
         self.cons = cons
         inferred_device = getattr(gps, "device", None)
+        if not isinstance(inferred_device, (str, torch.device)):
+            inferred_device = None
         inferred_dtype = getattr(gps, "dtype", None)
-        self.device = get_device(device if device is not None else inferred_device)
-        self.dtype = get_dtype(dtype if dtype is not None else inferred_dtype)
+        if not isinstance(inferred_dtype, torch.dtype):
+            inferred_dtype = None
+        resolved_runtime = resolve_runtime(
+            runtime,
+            device=device if device is not None else inferred_device,
+            dtype=dtype if dtype is not None else inferred_dtype,
+        )
+        self.runtime = resolved_runtime
+        self.device = resolved_runtime.device
+        self.dtype = resolved_runtime.dtype
         self.tkwargs = tensor_kwargs(device=self.device, dtype=self.dtype)
         self.q = q
         self.NUM_RESTARTS = NUM_RESTARTS
