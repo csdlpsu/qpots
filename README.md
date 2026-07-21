@@ -65,99 +65,28 @@ See MathWorks' [MATLAB Engine for Python installation guide](https://www.mathwor
 The example below runs $q\texttt{POTS}$ on the two-objective Branin-Currin benchmark.
 
 ```python
-import time
-import warnings
+from qpots import Function, QPOTSConfig, QPOTSRunner
 
-import torch
-from botorch.utils.transforms import unnormalize
+problem = Function("branincurrin", dim=2, nobj=2)
+config = QPOTSConfig(n_initial=20, iterations=50, batch_size=1)
+result = QPOTSRunner(problem, config).run()
 
-from qpots.acquisition import Acquisition
-from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
-from qpots.function import Function
-from qpots.model_object import ModelObject
-from qpots.utils.utils import expected_hypervolume
-
-warnings.filterwarnings("ignore")
-
-settings = {
-    "ntrain": 20,
-    "iters": 50,
-    "reps": 20,
-    "q": 1,
-    "wd": ".",
-    "ref_point": torch.tensor([-300.0, -18.0], device=DEFAULT_DEVICE, dtype=DEFAULT_DTYPE),
-    "dim": 2,
-    "nobj": 2,
-    "ncons": 0,
-    "nystrom": 0,
-    "nychoice": "pareto",
-    "ngen": 10,
-}
-
-test_function = Function("branincurrin", dim=settings["dim"], nobj=settings["nobj"])
-evaluate = test_function.evaluate
-bounds = test_function.get_bounds()
-
-torch.manual_seed(1023)
-
-train_x = torch.rand(
-    settings["ntrain"],
-    settings["dim"],
-    device=DEFAULT_DEVICE,
-    dtype=DEFAULT_DTYPE,
-)
-train_y = evaluate(unnormalize(train_x, bounds))
-
-model = ModelObject(
-    train_x=train_x,
-    train_y=train_y,
-    bounds=bounds,
-    nobj=settings["nobj"],
-    ncons=settings["ncons"],
-)
-model.fit_gp()
-
-acquisition = Acquisition(test_function, model, q=settings["q"])
-
-for iteration in range(settings["iters"]):
-    start = time.time()
-    new_x = acquisition.qpots(bounds=bounds, iteration=iteration, **settings)
-    elapsed = time.time() - start
-
-    new_y = evaluate(unnormalize(new_x.reshape(-1, settings["dim"]), bounds))
-    hypervolume, _ = expected_hypervolume(model, ref_point=settings["ref_point"])
-
-    print(
-        f"Iteration: {iteration}, "
-        f"New candidate: {new_x}, "
-        f"Time: {elapsed:.3f}s, "
-        f"HV: {hypervolume}"
-    )
-
-    train_x = torch.row_stack([train_x, new_x.view(-1, settings["dim"])])
-    train_y = torch.row_stack([train_y, new_y])
-
-    model = ModelObject(
-        train_x=train_x,
-        train_y=train_y,
-        bounds=bounds,
-        nobj=settings["nobj"],
-        ncons=settings["ncons"],
-    )
-    model.fit_gp()
-    acquisition = Acquisition(test_function, model, q=settings["q"])
+print(result.train_x)
+print(result.train_y)
 ```
 
 ## Runtime Precision And Device
 
-$q\texttt{POTS}$ keeps precision and device selection in one easy-to-find place: [`qpots/config.py`](qpots/config.py). By default, the package uses CUDA when PyTorch detects a GPU and otherwise falls back to CPU:
+$q\texttt{POTS}$ uses CUDA when PyTorch detects a GPU and otherwise falls back to CPU. Configure newly-created objects without editing the installed package:
 
 ```python
-DEFAULT_DTYPE = torch.float64
-DEFAULT_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import torch
+from qpots import RuntimeConfig, set_default_runtime
+
+set_default_runtime(RuntimeConfig(device="cpu", dtype=torch.float64))
 ```
 
-Change `DEFAULT_DTYPE` to `torch.float32` for lower-memory single precision, or keep `torch.float64` for the default double-precision behavior used by BoTorch. Core package tensors created by $q\texttt{POTS}$ inherit these settings unless you pass an explicit `device` or `dtype`.
+Per-object `runtime`, `device`, and `dtype` arguments override this default.
 
 For complete scripts, see:
 

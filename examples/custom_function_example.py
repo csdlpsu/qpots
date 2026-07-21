@@ -1,85 +1,31 @@
-"""
-This file demonstrates how to use a custom function
-"""
-import warnings
-import time
-import os
-import numpy as np
-
-warnings.filterwarnings('ignore')
-
-from qpots.acquisition import Acquisition
-from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
-from qpots.model_object import ModelObject
-from qpots.config import DEFAULT_DEVICE, DEFAULT_DTYPE
-from qpots.utils.utils import expected_hypervolume
-from qpots.function import Function
+"""Optimize a user-defined two-objective function with qPOTS."""
 
 import torch
-from torch import Tensor
-from botorch.utils.transforms import unnormalize
 
-device = DEFAULT_DEVICE
-args = dict(
-        {
-            "ntrain": 20,
-            "iters": 100,
-            "reps": 1,
-            "q": 1,
-            "wd": ".",
-            "ref_point": -1*torch.tensor([5000., 300.], device=device, dtype=DEFAULT_DTYPE),
-            "dim": 2,
-            "nobj": 2,
-            "ncons": 0,
-            "nystrom": 0,
-            "nychoice": "pareto",
-            "ngen": 10,
-        }
-    )
+from qpots import Function, QPOTSConfig, QPOTSRunner
 
-# Negating the objective for maximization
-def custom_function(X: Tensor) -> Tensor:
-    f1 = X[:, 0]**2 + X[:, 1]**2 + 2*X[:, 0]*X[:, 1]**2
-    f2 = (X[:, 0] - 1)**2 + (X[:, 1] - 1)**2
-    return -1*torch.stack([f1, f2], dim=-1)
 
-custom_bounds = torch.tensor([(-5., 0.), (10., 15.)], device=device, dtype=DEFAULT_DTYPE) # Normalized lower and upper bounds, two objectives. If bounds are unnormalized then it is proper to normalize them
-tf = Function(name=None, dim=args["dim"], nobj=args["nobj"], custom_func=custom_function, bounds=custom_bounds)
-f = tf.evaluate
+def custom_function(X: torch.Tensor) -> torch.Tensor:
+    """Return negated objectives because qPOTS maximizes its model outputs."""
+    f1 = X[:, 0] ** 2 + X[:, 1] ** 2 + 2 * X[:, 0] * X[:, 1] ** 2
+    f2 = (X[:, 0] - 1) ** 2 + (X[:, 1] - 1) ** 2
+    return -torch.stack((f1, f2), dim=-1)
 
-os.makedirs(args["wd"], exist_ok=True)
-torch.manual_seed(1023)
 
-train_x = torch.rand([args["ntrain"], args["dim"]], device=device, dtype=DEFAULT_DTYPE) # Normalized
-train_y = f(unnormalize(train_x, bounds=custom_bounds))
+problem = Function(
+    dim=2,
+    nobj=2,
+    custom_func=custom_function,
+    bounds=torch.tensor([[-5.0, 0.0], [10.0, 15.0]]),
+)
+config = QPOTSConfig(
+    n_initial=20,
+    iterations=100,
+    batch_size=1,
+    generations=10,
+    seed=1023,
+)
+result = QPOTSRunner(problem, config).run()
 
-print(min(train_y[:,0]), min(train_y[:,1]))
-
-gps = ModelObject(train_x=train_x, train_y=train_y, bounds=custom_bounds, nobj=args["nobj"], ncons=args["ncons"], device=device)
-gps.fit_gp()
-
-acq = Acquisition(tf, gps, cons=None, device=device, q=args["q"])
-
-times, hvs = [], []
-for i in range(args["iters"]):
-    t1 = time.time()
-    newx = acq.qpots(bounds=custom_bounds, iteration=i, **args) # Returned as normalized values
-    t2 = time.time()
-    times.append(t2 - t1)
-
-    newy = f(unnormalize(newx.reshape(-1, args["dim"]), custom_bounds))
-    hv, _ = expected_hypervolume(gps, ref_point=args['ref_point'])
-    hvs.append(hv)
-
-    print(f"Iteration: {i}, New candidate: {newx}, Time: {t2 - t1}, HV: {hv}")
-        
-    train_x = torch.row_stack([train_x, newx.view(-1, args["dim"])])
-    train_y = torch.row_stack([train_y, newy])
-    gps = ModelObject(train_x, train_y, custom_bounds, args["nobj"], args["ncons"], device=device)
-    gps.fit_gp()
-
-    np.save(f"{args['wd']}/train_x.npy", train_x.detach().cpu().numpy())
-    np.save(f"{args['wd']}/train_y.npy", train_y.detach().cpu().numpy())
-    np.save(f"{args['wd']}/hv.npy", hvs)
-    np.save(f"{args['wd']}/times.npy", times)
-    
+torch.save(result.train_x.cpu(), "train_x.pt")
+torch.save(result.train_y.cpu(), "train_y.pt")

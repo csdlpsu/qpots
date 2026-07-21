@@ -25,6 +25,7 @@ qPOTS Documentation
    qpots_config
    qpots_function
    qpots_model_object
+   qpots_runner
    qpots_ts_emo_wrappers
    qpots_tsemo_runner
    qpots_utils_acq_utils

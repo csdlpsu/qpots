@@ -11,6 +11,12 @@ from qpots.config import (
 )
 from qpots.benchmark_registry import available_benchmarks, create_benchmark
 from qpots.function import EvaluationResult, Function
+from qpots.runner import (
+    IterationResult,
+    OptimizationResult,
+    QPOTSConfig,
+    QPOTSRunner,
+)
 
 __all__ = [
     "DEFAULT_DEVICE",
@@ -22,4 +28,8 @@ __all__ = [
     "Function",
     "available_benchmarks",
     "create_benchmark",
+    "IterationResult",
+    "OptimizationResult",
+    "QPOTSConfig",
+    "QPOTSRunner",
 ]
