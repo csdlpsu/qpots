@@ -4,7 +4,6 @@ import torch
 
 from qpots import Function, QPOTSConfig, QPOTSRunner
 
-
 problem = Function("osy", dim=6, nobj=2)
 config = QPOTSConfig(
     n_initial=60,

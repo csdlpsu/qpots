@@ -1,6 +1,9 @@
 from pathlib import Path
-import tomllib
 
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - exercised by the Python 3.10 CI job
+    import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -10,10 +13,7 @@ def test_example_dependencies_are_optional():
     core = metadata["project"]["dependencies"]
     extras = metadata["project"]["optional-dependencies"]
 
-    assert not any(
-        dependency.startswith(("pandas", "matplotlib", "mpi4py"))
-        for dependency in core
-    )
+    assert not any(dependency.startswith(("pandas", "matplotlib", "mpi4py")) for dependency in core)
     assert set(extras["examples"]) == {"matplotlib", "pandas"}
     assert extras["hpc"] == ["mpi4py"]
 

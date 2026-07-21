@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import torch
@@ -190,9 +190,7 @@ class QPOTSRunner:
             model.fit_gp()
         return model
 
-    def _apply_partial_observations(
-        self, full_values: Tensor, task_ids: Tensor | None
-    ) -> Tensor:
+    def _apply_partial_observations(self, full_values: Tensor, task_ids: Tensor | None) -> Tensor:
         if not self.config.partial_evaluations:
             return full_values
         if task_ids is None:
@@ -237,9 +235,7 @@ class QPOTSRunner:
         full_values = self._stack_evaluation(evaluations)
         observed_values = self._apply_partial_observations(full_values, task_ids)
 
-        self._train_x_normalized = torch.row_stack(
-            (self._train_x_normalized, candidate_normalized)
-        )
+        self._train_x_normalized = torch.row_stack((self._train_x_normalized, candidate_normalized))
         self._train_y = torch.row_stack((self._train_y, observed_values))
         result = IterationResult(
             iteration=self._iteration,

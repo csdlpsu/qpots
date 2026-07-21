@@ -109,7 +109,12 @@ def expected_hypervolume(
         - pareto_front (torch.Tensor): The Pareto front tensor.
     """
     train_y_filled=posterior_mean_fill(gps)
-    runtime_dtype = get_dtype(getattr(gps, "dtype", None))
+    configured_dtype = getattr(gps, "dtype", None)
+    runtime_dtype = (
+        configured_dtype
+        if isinstance(configured_dtype, torch.dtype)
+        else get_dtype()
+    )
     runtime_device = train_y_filled.device
     train_y_filled = train_y_filled.to(device=runtime_device, dtype=runtime_dtype)
     ref_point = as_tensor(

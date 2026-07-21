@@ -74,9 +74,7 @@ class Function:
             raise TypeError("bounds must be a torch.Tensor with shape (2, dim)")
         resolved = to_runtime(bounds, self.device, self.dtype)
         if resolved.ndim != 2 or resolved.shape != (2, self.dim):
-            raise ValueError(
-                f"bounds must have shape (2, {self.dim}); got {tuple(resolved.shape)}"
-            )
+            raise ValueError(f"bounds must have shape (2, {self.dim}); got {tuple(resolved.shape)}")
         if not torch.isfinite(resolved).all():
             raise ValueError("bounds must contain only finite values")
         if not torch.all(resolved[0] < resolved[1]):
@@ -87,6 +85,9 @@ class Function:
         self.func = create_benchmark(self.name or "", dim=self.dim, nobj=self.nobj)
         if hasattr(self.func, "to"):
             self.func = self.func.to(device=self.device, dtype=self.dtype)
+        # Fixed-dimension BoTorch benchmarks (for example OSY) define their
+        # dimensionality through their bounds rather than the ``dim`` argument.
+        self.dim = self.func.bounds.shape[1]
         self.bounds = self._validate_bounds(self.func.bounds)
         if hasattr(self.func, "evaluate_slack"):
             self.cons = self._evaluate_builtin_constraints
@@ -185,6 +186,7 @@ class Function:
     def get_cons(self) -> Callable[[Tensor], Tensor] | None:
         """Return the separate constraint callable, if one is available."""
         if self.combined_func is not None:
+
             def combined_constraints(X: Tensor) -> Tensor:
                 resolved_input = self._coerce_input(X)
                 constraints = self._call_combined(resolved_input).constraints

@@ -1,40 +1,47 @@
+from typing import Callable, Optional
+
 import torch
-import numpy as np
-from typing import Optional, Callable
-from torch import Tensor
-from scipy.spatial.distance import cdist
-from botorch.utils.transforms import normalize
-from botorch.models.model_list_gp_regression import ModelListGP
-from botorch.models import MultiTaskGP
-from botorch.acquisition.objective import GenericMCObjective
-from botorch.utils.sampling import draw_sobol_samples, sample_simplex
-from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
-from botorch.sampling.normal import SobolQMCNormalSampler
-#from botorch.acquisition.multi_objective.parego import qLogNParEGO
+
+# from botorch.acquisition.multi_objective.parego import qLogNParEGO
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
-from botorch.acquisition.multi_objective.parego import qLogNParEGO
-from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
-from botorch.acquisition.multi_objective.utils import (
-    sample_optimal_points,
-    random_search_optimizer,
-    compute_sample_box_decomposition,
-)
-from botorch.acquisition.multi_objective.predictive_entropy_search import (
-    qMultiObjectivePredictiveEntropySearch,
-)
-from botorch.acquisition.multi_objective.max_value_entropy_search import (
-    qLowerBoundMultiObjectiveMaxValueEntropySearch,
-)
 from botorch.acquisition.multi_objective.joint_entropy_search import (
     qLowerBoundMultiObjectiveJointEntropySearch,
 )
+from botorch.acquisition.multi_objective.logei import qLogExpectedHypervolumeImprovement
+from botorch.acquisition.multi_objective.max_value_entropy_search import (
+    qLowerBoundMultiObjectiveMaxValueEntropySearch,
+)
+from botorch.acquisition.multi_objective.parego import qLogNParEGO
+from botorch.acquisition.multi_objective.predictive_entropy_search import (
+    qMultiObjectivePredictiveEntropySearch,
+)
+from botorch.acquisition.multi_objective.utils import (
+    compute_sample_box_decomposition,
+    random_search_optimizer,
+    sample_optimal_points,
+)
+from botorch.acquisition.objective import GenericMCObjective
+from botorch.models import MultiTaskGP
+from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.optim.optimize import optimize_acqf, optimize_acqf_list
+from botorch.sampling.normal import SobolQMCNormalSampler
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
-from qpots.utils.utils import unstandardize, unstandardize_ignore_nan, select_candidates, select_candidates_partial_info, select_candidates_total_correlation
-from qpots.utils.pymoo_problem import PyMooFunction, nsga2
+from botorch.utils.multi_objective.scalarization import get_chebyshev_scalarization
+from botorch.utils.sampling import draw_sobol_samples, sample_simplex
+from botorch.utils.transforms import normalize
+from scipy.spatial.distance import cdist
+from torch import Tensor
+
+from qpots.config import RuntimeConfig, as_tensor, resolve_runtime, tensor_kwargs, to_runtime
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
-from qpots.config import RuntimeConfig, as_tensor, resolve_runtime, tensor_kwargs, to_runtime
+from qpots.utils.pymoo_problem import PyMooFunction, nsga2
+from qpots.utils.utils import (
+    select_candidates,
+    select_candidates_total_correlation,
+    unstandardize,
+    unstandardize_ignore_nan,
+)
 
 
 class Acquisition:
@@ -57,8 +64,8 @@ class Acquisition:
         """
         Initialize the multi-objective acquisition class.
 
-        This class provides various acquisition functions for multi-objective Bayesian 
-        optimization. It supports Gaussian Process models and handles inequality constraints 
+        This class provides various acquisition functions for multi-objective Bayesian
+        optimization. It supports Gaussian Process models and handles inequality constraints
         if provided.
 
         Parameters
@@ -68,7 +75,7 @@ class Acquisition:
         gps : ModelListGP
             A list of Gaussian Process models used for Bayesian optimization.
         cons : Optional[Callable], optional
-            A vector-valued function representing inequality constraints. If provided, 
+            A vector-valued function representing inequality constraints. If provided,
             the acquisition function will account for feasibility constraints.
         device : torch.device or str, optional
             The computational device to use. If omitted, qPOTS uses CUDA when
@@ -79,10 +86,10 @@ class Acquisition:
         q : int, optional
             The number of candidate points to sample per iteration. Defaults to 1.
         NUM_RESTARTS : int, optional
-            The number of restarts for optimizing the acquisition function. 
+            The number of restarts for optimizing the acquisition function.
             A higher value can improve optimization quality. Defaults to 10.
         RAW_SAMPLES : int, optional
-            The number of raw samples used in acquisition optimization. 
+            The number of raw samples used in acquisition optimization.
             Higher values increase exploration but may slow computation. Defaults to 512.
         """
         self.func = func
@@ -109,7 +116,6 @@ class Acquisition:
         self.nobj = gps.nobj
         self.ncons = gps.ncons
 
-
     def _nystrom_approx(
         self,
         x: Tensor,
@@ -124,8 +130,8 @@ class Acquisition:
         Perform Thompson sampling using the Nyström approximation for Gaussian Process (GP) models.
 
         The Nyström approximation is a method for approximating large covariance matrices
-        in Gaussian Process inference, improving computational efficiency while preserving 
-        accuracy. This function selects a subset of columns to approximate the full covariance 
+        in Gaussian Process inference, improving computational efficiency while preserving
+        accuracy. This function selects a subset of columns to approximate the full covariance
         matrix and then performs posterior sampling.
 
         Parameters
@@ -137,23 +143,23 @@ class Acquisition:
         m : int
             The number of landmarks (subset size) used in the Nyström approximation.
         pareto_set : Optional[Tensor], optional
-            A tensor containing Pareto optimal points. Required if ``col_choice`` is 'pareto'. 
+            A tensor containing Pareto optimal points. Required if ``col_choice`` is 'pareto'.
             Defaults to None.
         col_choice : str, optional
-            The column selection strategy for the Nyström approximation. 
+            The column selection strategy for the Nyström approximation.
             Options:
             - 'pareto' (default): Select columns based on proximity to Pareto optimal points.
             - 'random': Select a random subset of columns.
         seed_iter : int, optional
             An iteration index for seeding randomness in sampling. Defaults to 1.
         reg : float, optional
-            A small regularization constant added to the covariance matrix for numerical 
+            A small regularization constant added to the covariance matrix for numerical
             stability during matrix inversion. Defaults to 1e-6.
 
         Returns
         -------
         Tensor
-            A tensor containing posterior samples from the GP models. Infeasible points 
+            A tensor containing posterior samples from the GP models. Infeasible points
             are penalized if constraints exist.
         """
         torch.manual_seed(1024 + seed_iter)
@@ -171,12 +177,20 @@ class Acquisition:
             elif col_choice == "pareto":
                 if pareto_set is None:
                     raise ValueError("Pareto set is required for 'pareto' column choice.")
-                pareto_np = pareto_set.detach().cpu().numpy() if isinstance(pareto_set, torch.Tensor) else pareto_set
+                pareto_np = (
+                    pareto_set.detach().cpu().numpy()
+                    if isinstance(pareto_set, torch.Tensor)
+                    else pareto_set
+                )
                 D = cdist(pareto_np, x.detach().cpu().numpy())
                 cand_indices = D.argmin(axis=-1)
-                indices = torch.unique(torch.as_tensor(cand_indices, device=self.device).argsort()[:m])
+                indices = torch.unique(
+                    torch.as_tensor(cand_indices, device=self.device).argsort()[:m]
+                )
                 if len(indices) < m:
-                    extra_indices = torch.randperm(covariance.shape[-1], device=self.device)[:m - len(indices)]
+                    extra_indices = torch.randperm(covariance.shape[-1], device=self.device)[
+                        : m - len(indices)
+                    ]
                     indices = torch.cat((indices, extra_indices))
             else:
                 raise NotImplementedError(f"Column choice '{col_choice}' is not implemented.")
@@ -200,13 +214,14 @@ class Acquisition:
 
         if self.ncons > 0:
             ind_feasible = Ys_[..., -self.ncons :] <= 0
-            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Arbitrary low value for infeasible points
+            Ys_[
+                ~ind_feasible.squeeze(), : self.nobj
+            ] = -1e12  # Arbitrary low value for infeasible points
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
 
         return -Ys
-
 
     def _gp_posterior(self, x: Tensor, gps: ModelListGP, seed_iter: int = 1) -> Tensor:
         """
@@ -267,18 +282,107 @@ class Acquisition:
         torch.manual_seed(1024 + seed_iter)
 
         x = to_runtime(x, self.device, self.dtype)
-        model=gps.models[0]
-        #Do not need appending of task IDS for posterior sampling:
-        Ys_=model.posterior(normalize(x,to_runtime(gps.bounds, self.device, self.dtype))).sample().to(**self.tkwargs) #should be of size(n x k), where k = number of objective+constraints (tasks in the MTGP) (No need to unstandardize for NSGA-II optimization)
-        Ys_ = unstandardize_ignore_nan(Ys_, gps.train_y.to(self.device))
-        
+        model = gps.models[0]
+        # MultiTaskGP.posterior returns all modeled tasks, so explicit task IDs
+        # are not appended when drawing the sample path used by NSGA-II.
+        standardized_samples = (
+            model.posterior(normalize(x, to_runtime(gps.bounds, self.device, self.dtype)))
+            .sample()
+            .to(**self.tkwargs)
+        )
+        sampled_values = unstandardize_ignore_nan(standardized_samples, gps.train_y.to(self.device))
+
         if self.ncons > 0:
-            ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
-            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
-            Ys = Ys_[..., : self.nobj]
+            feasible = (sampled_values[..., -self.ncons :] >= 0).all(dim=-1)
+            sampled_values[~feasible.squeeze(), : self.nobj] = -1e12
+            objective_samples = sampled_values[..., : self.nobj]
         else:
-            Ys = Ys_
-        return -Ys
+            objective_samples = sampled_values
+        return -objective_samples
+
+    def _make_qpots_posterior_path(
+        self,
+        bounds: Tensor,
+        iteration: int,
+        options: dict,
+        pareto_state: list,
+    ) -> Callable[[Tensor], Tensor]:
+        """Create the sampled objective passed to the evolutionary optimizer."""
+        if options["nystrom"] == 1:
+            landmark_count = max(1, int(0.2 * options["iters"]))
+
+            def posterior_path(x: Tensor) -> Tensor:
+                pareto_points = (
+                    normalize(as_tensor(pareto_state[0], **self.tkwargs), bounds)
+                    if pareto_state[0] is not None
+                    else torch.zeros_like(x)
+                )
+                return self._nystrom_approx(
+                    x.to(self.device),
+                    self.gps,
+                    landmark_count,
+                    pareto_points,
+                    col_choice=options["nychoice"],
+                    seed_iter=iteration,
+                )
+
+            return posterior_path
+
+        if options.get("mt", 0) == 1:
+
+            def posterior_path(x: Tensor) -> Tensor:
+                return self._mt_gp_posterior(x.to(self.device), self.gps, seed_iter=iteration)
+        else:
+
+            def posterior_path(x: Tensor) -> Tensor:
+                return self._gp_posterior(x.to(self.device), self.gps, seed_iter=iteration)
+
+        return posterior_path
+
+    def _optimize_qpots_posterior(self, bounds: Tensor, iteration: int, options: dict):
+        """Optimize one posterior sample path and return its Pareto set."""
+        pareto_state = [None]
+
+        def track_pareto(result) -> None:
+            pareto_state[0] = result.opt.get("X")
+
+        posterior_path = self._make_qpots_posterior_path(bounds, iteration, options, pareto_state)
+        pymoo_problem = PyMooFunction(
+            posterior_path,
+            n_var=options["dim"],
+            n_obj=self.nobj,
+            xl=bounds[0].detach().cpu().numpy(),
+            xu=bounds[1].detach().cpu().numpy(),
+            device=self.device,
+            dtype=self.dtype,
+        )
+        callback = track_pareto if options["nystrom"] == 1 else None
+        return nsga2(
+            pymoo_problem,
+            ngen=options["ngen"],
+            pop_size=100 * options["dim"],
+            seed=2430,
+            callback=callback,
+        )
+
+    def _select_qpots_batch(
+        self, pareto_points, bounds: Tensor, options: dict
+    ) -> Tensor | tuple[Tensor, Tensor]:
+        """Select a diverse batch and, when requested, its oracle task IDs."""
+        if options.get("partial_info", 0) == 1:
+            candidates, task_ids = select_candidates_total_correlation(
+                self.gps,
+                pareto_points,
+                self.device,
+                q=options["q"],
+                seed=2043,
+                thresh=options.get("threshold"),
+            )
+            return normalize(candidates, bounds), task_ids
+        candidates = select_candidates(
+            self.gps, pareto_points, self.device, q=options["q"], seed=2043
+        )
+        return normalize(candidates, bounds)
 
     def qpots(
         self,
@@ -292,13 +396,13 @@ class Acquisition:
         Parameters
         ----------
         bounds : Tensor
-            A tensor representing the lower and upper bounds for the 
+            A tensor representing the lower and upper bounds for the
             optimization problem.
         iteration : int
             The current iteration index, used for seeding randomness.
         **kwargs : dict
             Additional arguments for customization, including:
-            
+
             - ``nystrom`` (int): Whether to use the Nystrom approximation (1 for yes, 0 for no).
             - ``iters`` (int): Number of iterations used in the Nystrom approximation.
             - ``nychoice`` (str): Column selection method for the Nystrom approximation.
@@ -317,78 +421,9 @@ class Acquisition:
             ``(candidates, task_ids)``, where ``task_ids`` records which
             objectives or constraints should be evaluated at each candidate.
         """
-        def track_pareto(res):
-            """Store the latest NSGA-II Pareto set for Nyström column selection."""
-            pareto_set[0] = res.opt.get("X")
-
         bounds = to_runtime(bounds, self.device, self.dtype)
-        pareto_set = [None]
-
-        if kwargs["nystrom"] == 1:
-            gp_posterior_approx_ = lambda x: self._nystrom_approx(
-                x.to(self.device),
-                self.gps,
-                int(0.2 * kwargs["iters"]),
-                normalize(as_tensor(pareto_set[0], **self.tkwargs), bounds)
-                if pareto_set[0] is not None
-                else torch.zeros_like(x),
-                col_choice=kwargs["nychoice"],
-            )
-            pymoo_func_gp = PyMooFunction(
-                gp_posterior_approx_,
-                n_var=kwargs["dim"],
-                n_obj=self.nobj,
-                xl=bounds[0].detach().cpu().numpy(),
-                xu=bounds[1].detach().cpu().numpy(),
-                device=self.device,
-                dtype=self.dtype,
-            )
-            res = nsga2(
-                pymoo_func_gp,
-                ngen=kwargs["ngen"],
-                pop_size=100 * kwargs["dim"],
-                seed=2430,
-                callback=track_pareto,
-            )
-        else:
-            
-            if kwargs.get("mt", 0) == 1:
-                gp_posterior_ = lambda x: self._mt_gp_posterior(
-                    x.to(self.device), self.gps, seed_iter=iteration
-                )
-            else:
-                gp_posterior_ = lambda x: self._gp_posterior(
-                    x.to(self.device), self.gps, seed_iter=iteration
-                )
-            pymoo_func_gp = PyMooFunction(
-                gp_posterior_,
-                n_var=kwargs["dim"],
-                n_obj=self.nobj,
-                xl=bounds[0].detach().cpu().numpy(),
-                xu=bounds[1].detach().cpu().numpy(),
-                device=self.device,
-                dtype=self.dtype,
-            )
-
-            res = nsga2(
-                pymoo_func_gp,
-                ngen=kwargs["ngen"],
-                pop_size=100 * kwargs["dim"] ,
-                seed=2430,
-            )
-        
-        if kwargs.get("partial_info", 0) == 1:
-            #12/31 Now using total_correlation for candidate selection
-            selected_candidates, new_task_ids = select_candidates_total_correlation(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043, thresh=kwargs.get("threshold")
-            )
-            return normalize(selected_candidates, bounds), new_task_ids
-        else:
-            selected_candidates = select_candidates(
-                self.gps, res.X, self.device, q=kwargs["q"], seed=2043
-            )
-        
-        return normalize(selected_candidates, bounds)
+        pareto_result = self._optimize_qpots_posterior(bounds, iteration, kwargs)
+        return self._select_qpots_batch(pareto_result.X, bounds, kwargs)
 
     def qlogei(self, ref_point: Tensor | None = None) -> Tensor:
         """
@@ -397,16 +432,20 @@ class Acquisition:
         Parameters
         ----------
         ref_point : Tensor, optional
-            The reference point for hypervolume calculation, typically representing 
+            The reference point for hypervolume calculation, typically representing
             a baseline for performance. Defaults to ``[0.0, 0.0]``.
 
         Returns
         -------
         Tensor
-            A tensor containing the new candidate points selected based on 
+            A tensor containing the new candidate points selected based on
             qLogEI optimization.
         """
-        ref_point = as_tensor([0.0, 0.0], **self.tkwargs) if ref_point is None else to_runtime(ref_point, self.device, self.dtype)
+        ref_point = (
+            as_tensor([0.0, 0.0], **self.tkwargs)
+            if ref_point is None
+            else to_runtime(ref_point, self.device, self.dtype)
+        )
         standard_bounds = torch.zeros(2, self.func.dim, **self.tkwargs)
         standard_bounds[1] = 1
         train_y = self.gps.train_y.to(**self.tkwargs)
@@ -479,7 +518,7 @@ class Acquisition:
             options={"batch_limit": 3, "maxiter": 1000},
         )
         return new_x.to(self.device)
- 
+
     def qlogparego(self) -> Tensor:
         """
         Perform qParEGO optimization using qNParEGO from BoTorch.
@@ -530,7 +569,9 @@ class Acquisition:
             A tensor containing the candidate points selected by PESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
+        bounds = torch.row_stack(
+            [torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)]
+        )
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, _ = sample_optimal_points(
@@ -549,7 +590,7 @@ class Acquisition:
             q=self.q,
             num_restarts=5,
             raw_samples=512,
-            options={"with_grad": False}
+            options={"with_grad": False},
         )
         return candidates.to(self.device)
 
@@ -563,7 +604,9 @@ class Acquisition:
             A tensor containing the candidate points selected by MESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
+        bounds = torch.row_stack(
+            [torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)]
+        )
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, pf = sample_optimal_points(
@@ -609,7 +652,9 @@ class Acquisition:
             A tensor containing the candidate points generated by JESMO.
         """
         dim = self.func.dim
-        bounds = torch.row_stack([torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)])
+        bounds = torch.row_stack(
+            [torch.zeros(dim, **self.tkwargs), torch.ones(dim, **self.tkwargs)]
+        )
         model = ModelListGP(*self.gps.models).to(self.device)
 
         ps, pf = sample_optimal_points(
@@ -656,10 +701,8 @@ class Acquisition:
         standard_bounds = torch.row_stack(
             [torch.zeros(self.func.dim, **self.tkwargs), torch.ones(self.func.dim, **self.tkwargs)]
         )
-        return draw_sobol_samples(
-            bounds=standard_bounds, n=1, q=self.q
-        ).squeeze(0).to(self.device)
-    
+        return draw_sobol_samples(bounds=standard_bounds, n=1, q=self.q).squeeze(0).to(self.device)
+
     def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int = 0):
         """
         Perform Thompson Sampling Efficient Multiobjective Optimization (TS-EMO).
@@ -690,15 +733,15 @@ class Acquisition:
         pf : Tensor
             The Pareto frontier determined by TS-EMO.
         """
-        ts = TSEMORunner(self.func.name, 
-                         self.gps.train_x, 
-                         self.gps.train_y, 
-                         lb=[0.0]*self.gps.train_x.shape[1], 
-                         ub=[1.0]*self.gps.train_x.shape[1], 
-                         iters=iters, 
-                         batch_number=self.q)
+        ts = TSEMORunner(
+            self.func.name,
+            self.gps.train_x,
+            self.gps.train_y,
+            lb=[0.0] * self.gps.train_x.shape[1],
+            ub=[1.0] * self.gps.train_x.shape[1],
+            iters=iters,
+            batch_number=self.q,
+        )
         x, y, times = ts.tsemo_run(save_dir, rep)
         hv, pf = ts.tsemo_hypervolume(y, ref_point, train_shape, iters)
         return x, y, times, hv, pf
-
-        

@@ -2,6 +2,7 @@
 qPOTS package
 """
 
+from qpots.benchmark_registry import available_benchmarks, create_benchmark
 from qpots.config import (
     DEFAULT_DEVICE,
     DEFAULT_DTYPE,
@@ -9,7 +10,6 @@ from qpots.config import (
     get_default_runtime,
     set_default_runtime,
 )
-from qpots.benchmark_registry import available_benchmarks, create_benchmark
 from qpots.function import EvaluationResult, Function
 from qpots.runner import (
     IterationResult,

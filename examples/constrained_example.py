@@ -4,7 +4,6 @@ import torch
 
 from qpots import Function, QPOTSConfig, QPOTSRunner
 
-
 problem = Function("weldedbeam", dim=4, nobj=2)
 config = QPOTSConfig(
     n_initial=40,

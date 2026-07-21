@@ -6,11 +6,8 @@ from collections.abc import Callable
 
 from botorch.test_functions.multi_objective import (
     BNH,
-    BraninCurrin,
-    CONSTR,
     C2DTLZ2,
-    CarSideImpact,
-    ConstrainedBraninCurrin,
+    CONSTR,
     DH1,
     DH2,
     DH3,
@@ -21,21 +18,23 @@ from botorch.test_functions.multi_objective import (
     DTLZ4,
     DTLZ5,
     DTLZ7,
-    DiscBrake,
     GMM,
     MW7,
     OSY,
-    Penicillin,
     SRN,
-    ToyRobust,
-    VehicleSafety,
-    WeldedBeam,
     ZDT1,
     ZDT2,
     ZDT3,
+    BraninCurrin,
+    CarSideImpact,
+    ConstrainedBraninCurrin,
+    DiscBrake,
+    Penicillin,
+    ToyRobust,
+    VehicleSafety,
+    WeldedBeam,
 )
 from botorch.test_functions.synthetic import Branin
-
 
 BenchmarkFactory = Callable[[int, int], object]
 

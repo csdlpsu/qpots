@@ -45,7 +45,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=9.0.3"]
+test = [
+    "pytest>=9.0.3",
+    "ruff>=0.12",
+    "tomli>=2; python_version<'3.11'",
+]
 docs = ["sphinx", "sphinx-rtd-theme"]
 examples = ["matplotlib", "pandas"]
 hpc = ["mpi4py"]
@@ -53,3 +57,33 @@ hpc = ["mpi4py"]
 [project.urls]
 Homepage = "https://github.com/csdlpsu/qpots"
 Issues = "https://github.com/csdlpsu/qpots/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+include = [
+    "qpots/__init__.py",
+    "qpots/acquisition.py",
+    "qpots/benchmark_registry.py",
+    "qpots/config.py",
+    "qpots/function.py",
+    "qpots/model_object.py",
+    "qpots/runner.py",
+    "qpots/tsemo_runner.py",
+    "tests/test_config.py",
+    "tests/test_acquisition_readability.py",
+    "tests/test_function.py",
+    "tests/test_packaging.py",
+    "tests/test_runner.py",
+    "examples/constrained_example.py",
+    "examples/custom_function_example.py",
+    "examples/decoupled_osy_example.py",
+    "examples/unconstrained_branin.py",
+]
+extend-exclude = ["qpots/TS-EMO"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"

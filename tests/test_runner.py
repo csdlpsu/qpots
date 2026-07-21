@@ -88,7 +88,9 @@ def test_optional_final_refit(function):
 def test_step_returns_physical_and_normalized_points(function):
     runner = make_runner(function, QPOTSConfig(iterations=1, n_initial=2))
     result = runner.step()
-    assert torch.allclose(result.candidate_x_normalized, torch.tensor([[0.25]], dtype=torch.float64))
+    assert torch.allclose(
+        result.candidate_x_normalized, torch.tensor([[0.25]], dtype=torch.float64)
+    )
     assert torch.allclose(result.candidate_x, torch.tensor([[-1.0]], dtype=torch.float64))
 
 
