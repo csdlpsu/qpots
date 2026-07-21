@@ -47,6 +47,8 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=9.0.3"]
 docs = ["sphinx", "sphinx-rtd-theme"]
+examples = ["matplotlib", "pandas"]
+hpc = ["mpi4py"]
 
 [project.urls]
 Homepage = "https://github.com/csdlpsu/qpots"

@@ -2,6 +2,8 @@
 # Plot qPOTS noise ablation
 
 """
+Install plotting dependencies with ``pip install qpots[examples]``.
+
 Reads:
   - hv_traces_agg.csv (required)
   - hv_traces_raw.csv (optional for per-rep overlay)

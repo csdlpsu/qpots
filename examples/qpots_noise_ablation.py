@@ -2,6 +2,8 @@
 """
 qPOTS noise ablation on Branin-Currin
 -------------------------------------
+Install plotting dependencies with ``pip install qpots[examples]``.
+
 Runs qPOTS on the Branin-Currin bi-objective test function across multiple
 Gaussian observation noise levels, repetitions, and budgets.
 

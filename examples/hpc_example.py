@@ -1,6 +1,8 @@
 """
 This file demonstrates how to use an HPC environment for parallelization
 
+Install MPI support with ``pip install qpots[hpc]``.
+
 Example python command
 mpirun python3 -m hpc_example --func branincurrin --rp " -300." " -18." --dim 2 --nobj 2 --reps 10 --ntrain 5 --nystrom 0 --iters 50 --wd "."
 """
