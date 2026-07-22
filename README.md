@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/qpots-logo.png" alt="qPOTS logo" width="150">
+  <img src="https://raw.githubusercontent.com/csdlpsu/qpots/main/assets/qpots-logo.png" alt="qPOTS logo" width="150">
 </p>
 
 <p align="center">

@@ -1,3 +1,5 @@
+include CHANGELOG.md
+include tools/extract_release_notes.py
 global-exclude __pycache__/*
 global-exclude *.py[cod]
 global-exclude *~
