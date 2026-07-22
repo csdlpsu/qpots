@@ -70,7 +70,7 @@ Choose a workflow
      - :doc:`constrained_tutorial`
    * - Objectives or constraints can be measured separately
      - qPOTS-DOE with a multitask Gaussian process
-     - :doc:`decoupled_osy_example`
+     - :doc:`qpots_doe`
 
 Scope and references
 --------------------

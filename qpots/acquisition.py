@@ -411,7 +411,7 @@ class Acquisition:
             - ``q`` (int): Number of candidates to select.
             - ``mt`` (int): Whether to use MultiTaskGP for posterior sampling (1 for yes, 0 for no).
             - ``partial_info`` (int): Whether to perform candidate selection using partial information (1 for yes, 0 for no).
-            - ``variance_threshold`` (float, optional): Variance threshold used during partial-information selection.
+            - ``threshold`` (float, optional): Total-correlation threshold used during partial-information selection.
 
         Returns
         -------

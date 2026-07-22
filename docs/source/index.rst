@@ -19,7 +19,8 @@ evaluations* and selected objectives or constraints can be queried separately.
 Start with :doc:`introduction` to understand the problem qPOTS addresses, then
 follow :doc:`installation` and the :doc:`getting_started` guide. The
 :doc:`constrained_tutorial` reproduces the workflow illustrated in Figure 1 of
-the JOSS paper.
+the JOSS paper, and :doc:`qpots_doe` explains when and how to use decoupled
+evaluations.
 
 .. toctree::
    :maxdepth: 2
@@ -35,6 +36,7 @@ the JOSS paper.
 
    getting_started
    constrained_tutorial
+   qpots_doe
 
 .. toctree::
    :maxdepth: 1
