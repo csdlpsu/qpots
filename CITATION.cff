@@ -1,7 +1,8 @@
 cff-version: 1.2.0
 message: "If you use qPOTS in your research, please cite the JOSS paper and the AISTATS qPOTS paper."
 title: "qPOTS: Batch Pareto optimal Thompson sampling for multiobjective Bayesian optimization"
-version: 2.0.1
+version: 2.1.0
+date-released: 2026-07-22
 license: GPL-3.0-only
 repository-code: "https://github.com/csdlpsu/qpots"
 authors:

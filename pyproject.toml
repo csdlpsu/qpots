@@ -20,7 +20,7 @@ include = ["qpots*"]
 
 [project]
 name = "qpots"
-version = "2.0.1"
+version = "2.1.0"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
