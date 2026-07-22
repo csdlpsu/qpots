@@ -1,22 +1,10 @@
-"""Run qPOTS on a custom two-objective Branin problem."""
+"""Run unconstrained qPOTS on the two-objective Branin--Currin benchmark."""
 
 import torch
-from botorch.test_functions.synthetic import Branin
 
 from qpots import Function, QPOTSConfig, QPOTSRunner
 
-
-def custom_branin(X: torch.Tensor) -> torch.Tensor:
-    values = Branin(negate=True)(X)
-    return values.unsqueeze(-1).repeat(1, 2)
-
-
-problem = Function(
-    dim=2,
-    nobj=2,
-    custom_func=custom_branin,
-    bounds=torch.tensor([[-5.0, 0.0], [10.0, 15.0]]),
-)
+problem = Function("branincurrin", dim=2, nobj=2)
 config = QPOTSConfig(
     n_initial=20,
     iterations=100,

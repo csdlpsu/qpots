@@ -8,6 +8,9 @@
 - Tests Python 3.11, 3.12, and 3.13, including a monthly compatibility run.
 - Automates validated PyPI publishing and GitHub Releases from semantic version tags.
 - Uses an absolute logo URL so the project image renders on PyPI.
+- Adds an introduction and statement of need, complete installation and
+  citation guidance, guided optimization tutorials, a Figure 1 reproduction,
+  and dedicated qPOTS-DOE documentation.
 
 ## v2.0.1
 
