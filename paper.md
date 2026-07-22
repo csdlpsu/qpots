@@ -72,7 +72,7 @@ Figure \ref{fig:doe} illustrates the additional information available to a decou
 
 The current software release also supports correlated objective and constraint tasks with partial observations. The repository provides tests and worked examples for that workflow, hosted documentation at ReadTheDocs, and PyPI and source installation paths. The companion methods manuscript reports the algorithmic derivation and benchmark analysis [@renganathan2026qpotsdoe]; those results are not repeated as claims of this software paper.
 
-Independent evaluation is beginning to emerge: SPREAD includes qPOTS in a numerical comparison of multiobjective Bayesian optimization methods [@hotegni2025spread]. Other publications cite qPOTS while discussing generative molecular design, sustainable process systems, class-imbalance learning, and many-objective optimization [@muthyala2025generative; @kudva2026multi; @wang2025automated; @jiang2026we]. We treat those citations as evidence of awareness of `qPOTS` as a state of the art benchmark in the multiobjective Bayesian optimization community.
+Independent evaluation is beginning to emerge: SPREAD includes qPOTS in a numerical comparison of multiobjective Bayesian optimization methods [@hotegni2025spread]. Other publications cite qPOTS while discussing generative molecular design, sustainable process systems, class-imbalance learning, and many-objective optimization [@muthyala2025generative; @kudva2026multi; @wang2025automated; @jiang2026we]. We treat those citations as evidence of both awareness of `qPOTS` and as a state-of-the-art benchmark in the multiobjective Bayesian optimization community.
 
 # AI usage disclosure
 
