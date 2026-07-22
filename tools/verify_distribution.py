@@ -68,7 +68,11 @@ def verify_sdist(path: Path) -> None:
         names = archive.getnames()
         _reject_dependency_manifests(names, path.name)
         typed_names = [name for name in names if name.endswith("/qpots/py.typed")]
-        metadata_names = [name for name in names if name.endswith("/PKG-INFO")]
+        metadata_names = [
+            name
+            for name in names
+            if PurePosixPath(name).name == "PKG-INFO" and len(PurePosixPath(name).parts) == 2
+        ]
         verifier_names = [name for name in names if name.endswith("/tools/verify_distribution.py")]
         if len(typed_names) != 1:
             raise ValueError(f"{path.name}: qpots/py.typed is missing")
