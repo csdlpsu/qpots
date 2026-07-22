@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.1.0
+
 - Adds injectable runtime configuration, extensible function evaluation, and a typed high-level optimization runner.
 - Declares optional example dependencies and improves acquisition-code readability and style checks.
 - Consolidates dependency metadata in `pyproject.toml` and modernizes package license metadata.
@@ -10,7 +12,7 @@
 - Uses an absolute logo URL so the project image renders on PyPI.
 - Adds an introduction and statement of need, complete installation and
   citation guidance, guided optimization tutorials, a Figure 1 reproduction,
-  and dedicated qPOTS-DOE documentation.
+  and dedicated qPOTS-Decoupled documentation.
 - Defines and tests the supported top-level API, ships a ``py.typed`` marker,
   and documents compatibility and deprecation guarantees for qPOTS 2.x users.
 - Adds reproducible acceptance checks for supported Python versions, examples,
