@@ -1,9 +1,5 @@
+import tomllib
 from pathlib import Path
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - exercised by the Python 3.10 CI job
-    import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -26,6 +22,18 @@ def test_pyproject_is_the_only_dependency_manifest():
     assert not (PROJECT_ROOT / "requirements.txt").exists()
     assert not (PROJECT_ROOT / "tests" / "requirements.txt").exists()
     assert all("<3" not in dependency for dependency in metadata["project"]["dependencies"])
+
+
+def test_supported_python_versions_are_declared():
+    metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+    project = metadata["project"]
+
+    assert project["requires-python"] == ">=3.11"
+    assert {
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+    }.issubset(project["classifiers"])
 
 
 def test_core_package_imports_without_optional_example_modules():

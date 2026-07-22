@@ -12,7 +12,7 @@ To install the MATLAB Engine, follow the instructions at this link:
 `Install MATLAB Engine for Python <https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html>`_.
 
 **Note:** The MATLAB Engine is only required if you plan on using TS-EMO and must be installed for a supported Python version and the corresponding MATLAB version on your machine (MATLAB installation required).  
-The BoTorch implementation of the other acquisition functions (including qPOTS) supports Python 3.10 and 3.11 and only requires the dependencies automatically installed by pip.
+The BoTorch implementation of the other acquisition functions (including qPOTS) requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, and 3.13. It only requires the dependencies automatically installed by pip.
 
 To build from source, clone the repository and run pip in the top-level directory::
 

@@ -1,4 +1,4 @@
-name: CI Workflow
+name: CI
 
 on:
   push:
@@ -7,14 +7,22 @@ on:
   pull_request:
     branches:
       - main
+  schedule:
+    - cron: "0 9 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11']
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - name: Checkout code
@@ -24,7 +32,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -32,7 +40,14 @@ jobs:
           python -m pip install -e ".[test,docs]"
 
       - name: Run tests
-        run: python -m pytest tests/
+        run: python -m pytest -q tests/
+
+      - name: Check style
+        if: matrix.python-version == '3.13'
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
 
       - name: Build documentation
-        run: python -m sphinx -b html docs/source docs/build/html
+        if: matrix.python-version == '3.13'
+        run: python -m sphinx -W -b html docs/source docs/build/html

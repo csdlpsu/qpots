@@ -28,9 +28,12 @@ authors = [
 ]
 description = "A BoTorch wrapper for solving multiobjective optimization problems with an implementation of the qPOTS algorithm."
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
 license = "GPL-3.0-only"
@@ -49,7 +52,6 @@ dependencies = [
 test = [
     "pytest>=9.0.3",
     "ruff>=0.12",
-    "tomli>=2; python_version<'3.11'",
 ]
 docs = ["sphinx", "sphinx-rtd-theme"]
 examples = ["matplotlib", "pandas"]
@@ -64,7 +66,7 @@ Releases = "https://github.com/csdlpsu/qpots/releases"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 include = [
     "qpots/__init__.py",
     "qpots/acquisition.py",

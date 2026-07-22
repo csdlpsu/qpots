@@ -46,7 +46,7 @@ cd qpots
 pip install .
 ```
 
-$q\texttt{POTS}$ supports Python 3.10 and 3.11. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, scikit-learn, and pymoo.
+$q\texttt{POTS}$ requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, and 3.13. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, scikit-learn, and pymoo.
 
 ### Optional MATLAB Engine
 
