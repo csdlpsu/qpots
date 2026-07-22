@@ -1,5 +1,6 @@
 include CHANGELOG.md
 include tools/extract_release_notes.py
+include tools/verify_distribution.py
 global-exclude __pycache__/*
 global-exclude *.py[cod]
 global-exclude *~
