@@ -18,6 +18,16 @@ def test_example_dependencies_are_optional():
     assert extras["hpc"] == ["mpi4py"]
 
 
+def test_pyproject_is_the_only_dependency_manifest():
+    metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+
+    assert metadata["project"]["license"] == "GPL-3.0-only"
+    assert metadata["project"]["license-files"] == ["LICENSE"]
+    assert not (PROJECT_ROOT / "requirements.txt").exists()
+    assert not (PROJECT_ROOT / "tests" / "requirements.txt").exists()
+    assert all("<3" not in dependency for dependency in metadata["project"]["dependencies"])
+
+
 def test_core_package_imports_without_optional_example_modules():
     import qpots
 
