@@ -72,7 +72,7 @@ Figure \ref{fig:doe} illustrates the additional information available to a decou
 
 The current software release also supports correlated objective and constraint tasks with partial observations. The repository provides tests and worked examples for that workflow, hosted documentation at ReadTheDocs, and PyPI and source installation paths. The companion methods manuscript reports the algorithmic derivation and benchmark analysis [@renganathan2026qpotsdoe]; those results are not repeated as claims of this software paper.
 
-Independent evaluation is beginning to emerge: SPREAD includes qPOTS in a numerical comparison of multiobjective Bayesian optimization methods [@hotegni2025spread]. Other publications cite qPOTS while discussing generative molecular design, sustainable process systems, class-imbalance learning, and many-objective optimization [@muthyala2025generative; @kudva2026multi; @wang2025automated; @jiang2026we]. We treat those citations as evidence of awareness, not as evidence that the publications compare against, reuse, or build on the qPOTS software.
+Independent evaluation is beginning to emerge: SPREAD includes qPOTS in a numerical comparison of multiobjective Bayesian optimization methods [@hotegni2025spread]. Other publications cite qPOTS while discussing generative molecular design, sustainable process systems, class-imbalance learning, and many-objective optimization [@muthyala2025generative; @kudva2026multi; @wang2025automated; @jiang2026we]. We treat those citations as evidence of awareness of `qPOTS` as a state of the art benchmark in the multiobjective Bayesian optimization community.
 
 # AI usage disclosure
 
@@ -80,6 +80,6 @@ Anthropic Claude was used to assist with refactoring the code and structuring th
 
 # Acknowledgements
 
-The authors acknowledge the Computational Complex Engineered Systems Design Laboratory at Penn State for supporting development of this software. The authors also acknowledge the Penn State Institute for Computational and Data Sciences for access to computational research infrastructure through the Roar Core Facility. The authors have no specific external grant funding to declare for this software publication.
+The authors acknowledge the Penn State Institute for Computational and Data Sciences for access to computational research infrastructure through the Roar Core Facility.
 
 # References
