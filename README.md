@@ -115,6 +115,13 @@ The hosted documentation includes installation notes, API references, and worked
 
 [qpots.readthedocs.io](https://qpots.readthedocs.io/en/latest/)
 
+## Public API and compatibility
+
+The recommended public interfaces are importable directly from ``qpots``. The
+existing module imports used by qPOTS 2.0 scripts remain supported. See the
+[API compatibility policy](https://qpots.readthedocs.io/en/latest/api_compatibility.html)
+for the supported surface, migration guidance, and deprecation policy.
+
 ## Main Reference
 
 The main reference for this repository is the AISTATS 2025 paper:

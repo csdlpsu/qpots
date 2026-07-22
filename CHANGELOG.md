@@ -11,6 +11,8 @@
 - Adds an introduction and statement of need, complete installation and
   citation guidance, guided optimization tutorials, a Figure 1 reproduction,
   and dedicated qPOTS-DOE documentation.
+- Defines and tests the supported top-level API, ships a ``py.typed`` marker,
+  and documents compatibility and deprecation guarantees for qPOTS 2.x users.
 
 ## v2.0.1
 

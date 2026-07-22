@@ -29,6 +29,7 @@ evaluations.
    introduction
    installation
    citation
+   api_compatibility
 
 .. toctree::
    :maxdepth: 2
