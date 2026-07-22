@@ -88,4 +88,4 @@ the package-wide default. See :doc:`qpots_config` for the complete API.
 Next step
 ---------
 
-Continue to :doc:`unconstrained_example` for a complete optimization run.
+Continue to :doc:`getting_started` for a complete optimization run.

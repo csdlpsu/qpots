@@ -17,7 +17,9 @@ coupled evaluations as well as **qPOTS-DOE**, where DOE means *decoupled oracle
 evaluations* and selected objectives or constraints can be queried separately.
 
 Start with :doc:`introduction` to understand the problem qPOTS addresses, then
-follow :doc:`installation` and one of the worked examples below.
+follow :doc:`installation` and the :doc:`getting_started` guide. The
+:doc:`constrained_tutorial` reproduces the workflow illustrated in Figure 1 of
+the JOSS paper.
 
 .. toctree::
    :maxdepth: 2
@@ -26,6 +28,13 @@ follow :doc:`installation` and one of the worked examples below.
    introduction
    installation
    citation
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User guides
+
+   getting_started
+   constrained_tutorial
 
 .. toctree::
    :maxdepth: 1

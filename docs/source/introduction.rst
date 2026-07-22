@@ -64,10 +64,10 @@ Choose a workflow
      - Next page
    * - Objectives only
      - Independent Gaussian processes
-     - :doc:`unconstrained_example`
+     - :doc:`getting_started`
    * - Objectives and constraints evaluated together
      - Coupled constrained qPOTS
-     - :doc:`constrained_example`
+     - :doc:`constrained_tutorial`
    * - Objectives or constraints can be measured separately
      - qPOTS-DOE with a multitask Gaussian process
      - :doc:`decoupled_osy_example`

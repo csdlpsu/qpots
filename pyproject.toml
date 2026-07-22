@@ -84,6 +84,7 @@ include = [
     "tests/test_runner.py",
     "tools/extract_release_notes.py",
     "examples/constrained_example.py",
+    "examples/constrained_branin_currin_tutorial.py",
     "examples/custom_function_example.py",
     "examples/decoupled_osy_example.py",
     "examples/unconstrained_branin.py",
