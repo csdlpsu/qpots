@@ -69,7 +69,7 @@ Choose a workflow
      - Coupled constrained qPOTS
      - :doc:`constrained_tutorial`
    * - Objectives or constraints can be measured separately
-     - qPOTS-DOE with a multitask Gaussian process
+     - qPOTS-Decoupled with a multitask Gaussian process
      - :doc:`qpots_doe`
 
 Scope and references

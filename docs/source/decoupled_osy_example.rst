@@ -9,7 +9,7 @@ Why OSY is useful here
 ----------------------
 
 A coupled batch of two designs requires 16 scalar oracle evaluations. In
-qPOTS-DOE mode, the acquisition returns a task subset for each design. Values
+qPOTS-Decoupled mode, the acquisition returns a task subset for each design. Values
 from tasks outside that subset are stored as ``NaN`` and excluded from the next
 multitask Gaussian-process fit.
 

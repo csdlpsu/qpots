@@ -1,11 +1,11 @@
-qPOTS with decoupled oracle evaluations
-=======================================
+qPOTS-Decoupled
+===============
 
 .. important::
 
-   In **qPOTS-DOE**, DOE means **decoupled oracle evaluations**. It does not
-   mean design of experiments or refer to the initial sampling stage of
-   Bayesian optimization.
+   Earlier project material called this mode **qPOTS-DOE**, where DOE meant
+   **decoupled oracle evaluations**. The preferred name is now
+   **qPOTS-Decoupled** to avoid confusion with design of experiments.
 
 What is an oracle?
 ------------------
@@ -33,14 +33,14 @@ every selected design.
    * - Coupled multitask qPOTS
      - All outputs at every design, modeled jointly
      - ``multitask=True``, ``partial_evaluations=False``
-   * - qPOTS-DOE
+   * - qPOTS-Decoupled
      - A selected subset of outputs at each design
      - ``multitask=True``, ``partial_evaluations=True``
 
 How task selection works
 ------------------------
 
-qPOTS-DOE adds an output-selection step after qPOTS proposes candidate
+qPOTS-Decoupled adds an output-selection step after qPOTS proposes candidate
 locations:
 
 1. A multitask Gaussian process is fit jointly across objective and constraint
@@ -63,8 +63,8 @@ The figure illustrates task-specific observations for Branin and Currin, the
 posterior total-correlation field used for gating, and uncertainty reduction
 from information sharing between tasks.
 
-Configure qPOTS-DOE
--------------------
+Configure qPOTS-Decoupled
+-------------------------
 
 The constrained OSY benchmark has two objectives followed by six constraints:
 

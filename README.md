@@ -97,15 +97,16 @@ For complete scripts, see:
 - [Multiple acquisition functions](examples/multiple_acquisitions_example.py)
 - [HPC-style runs](examples/hpc_example.py)
 
-## qPOTS With Decoupled Oracle Evaluations
+## qPOTS-Decoupled
 
-**qPOTS-DOE** means qPOTS with *decoupled oracle evaluations*; DOE does not
-refer to design of experiments. Use this mode when objectives or constraints
-can be measured separately. A multitask Gaussian process shares information
-between outputs, while a total-correlation gate and mutual-information rule
-select which output tasks to query at each candidate.
+Use **qPOTS-Decoupled** when objectives or constraints can be measured
+separately. A multitask Gaussian process shares information between outputs,
+while a total-correlation gate and mutual-information rule select which output
+tasks to query at each candidate. Earlier project material called this mode
+``qPOTS-DOE`` (decoupled oracle evaluations); the new name avoids confusion
+with the established abbreviation for design of experiments.
 
-See the dedicated [qPOTS-DOE guide](https://qpots.readthedocs.io/en/latest/qpots_doe.html)
+See the dedicated [qPOTS-Decoupled guide](https://qpots.readthedocs.io/en/latest/qpots_doe.html)
 and the [decoupled OSY example](examples/decoupled_osy_example.py).
 
 ## Documentation

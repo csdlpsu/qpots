@@ -13,8 +13,8 @@ objectives compete and evaluations may be constrained.
 
 The package combines Gaussian-process surrogate models, Thompson sampling,
 and evolutionary optimization of posterior sample paths. It supports ordinary
-coupled evaluations as well as **qPOTS-DOE**, where DOE means *decoupled oracle
-evaluations* and selected objectives or constraints can be queried separately.
+coupled evaluations as well as **qPOTS-Decoupled**, where selected objectives
+or constraints can be queried separately.
 
 Start with :doc:`introduction` to understand the problem qPOTS addresses, then
 follow :doc:`installation` and the :doc:`getting_started` guide. The
