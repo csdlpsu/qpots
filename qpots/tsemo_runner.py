@@ -1,24 +1,29 @@
-import torch
-import numpy as np
 import os
 import sys
 import types
+
+import numpy as np
+import torch
+
 from qpots.config import as_tensor
+
 try:
     import matlab.engine
 except ImportError:
     matlab = types.ModuleType("matlab")
     matlab.engine = types.ModuleType("matlab.engine")
+
     def _missing_start_matlab(*args, **kwargs):
         raise ImportError("MATLAB Engine for Python is not installed.")
+
     class _MissingEngineError(Exception):
         pass
+
     matlab.double = lambda value: value
     matlab.engine.start_matlab = _missing_start_matlab
     matlab.engine.EngineError = _MissingEngineError
     sys.modules.setdefault("matlab", matlab)
     sys.modules.setdefault("matlab.engine", matlab.engine)
-    print("Failed to import matlab engine")
 from botorch.utils.multi_objective.box_decompositions import FastNondominatedPartitioning
 
 
@@ -26,7 +31,7 @@ class TSEMORunner:
     """
     Runs the TS-EMO algorithm iteratively using MATLAB.
 
-    The `TSEMORunner` class interfaces with MATLAB's TS-EMO implementation, allowing 
+    The `TSEMORunner` class interfaces with MATLAB's TS-EMO implementation, allowing
     users to iteratively optimize a multi-objective function while updating results at each step.
 
     Notes
@@ -161,7 +166,7 @@ class TSEMORunner:
         """
         Compute the hypervolume and Pareto front for a given set of objective values.
 
-        This function applies the Fast Nondominated Partitioning algorithm to evaluate 
+        This function applies the Fast Nondominated Partitioning algorithm to evaluate
         hypervolume improvement over multiple iterations.
 
         Parameters
@@ -169,10 +174,10 @@ class TSEMORunner:
         Y : torch.Tensor
             A tensor of objective values, where each row represents a solution's evaluated objectives.
         ref_point : torch.Tensor
-            A reference point for hypervolume calculation, typically set to be worse 
+            A reference point for hypervolume calculation, typically set to be worse
             than the worst observed objective values.
         train_shape : int
-            The number of initial training points. Determines how many points 
+            The number of initial training points. Determines how many points
             are included in the hypervolume calculation at each step.
         iters : int
             The number of iterations the optimization was run for.
@@ -189,7 +194,10 @@ class TSEMORunner:
             # Compute the hypervolume for the current set of points (up to train_shape + i)
             bd1 = FastNondominatedPartitioning(
                 ref_point=ref_point,
-                Y=-1 * as_tensor(Y[: train_shape + i, :], device=ref_point.device, dtype=ref_point.dtype),
+                Y=-1
+                * as_tensor(
+                    Y[: train_shape + i, :], device=ref_point.device, dtype=ref_point.dtype
+                ),
             )
             hv.append(bd1.compute_hypervolume())
             pf = bd1.pareto_Y  # Store the current Pareto front

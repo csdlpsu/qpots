@@ -1,29 +1,91 @@
 Installation
 ============
 
-qPOTS can be installed from pip or by source.
+Requirements
+------------
 
-To install qPOTS with pip, run the following command in a terminal::
+qPOTS requires Python 3.11 or newer and is continuously tested on Python 3.11,
+3.12, and 3.13. A virtual environment is recommended so that optimization
+dependencies remain isolated from other projects.
 
-    pip install qPOTS
+Install from PyPI
+-----------------
 
-This will install all of the necessary dependencies except for the MATLAB Engine, which is only needed for TS-EMO.  
-To install the MATLAB Engine, follow the instructions at this link:  
-`Install MATLAB Engine for Python <https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html>`_.
+Install the core package with:
 
-**Note:** The MATLAB Engine is only required if you plan on using TS-EMO and must be installed for a supported Python version and the corresponding MATLAB version on your machine (MATLAB installation required).  
-The BoTorch implementation of the other acquisition functions (including qPOTS) supports Python 3.10 and 3.11 and only requires the dependencies automatically installed by pip.
+.. code-block:: console
 
-To build from source, clone the repository and run pip in the top-level directory::
+   python -m pip install qpots
 
-    git clone https://github.com/csdlpsu/qpots
-    cd qpots
-    pip install .
+Verify the installation:
 
-Quick Note on MATLAB Engine Install
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code-block:: console
 
-Installing MATLAB engine is significantly easier if using a MATLAB version starting from 2022 to the latest version because it can be installed with pip. When Installing
-MATLAB engine with pip, the version has to match your installed version of MATLAB. For example, if I have MATLAB release version 2023b, I would run the following command in the terminal::
+   python -c "from importlib.metadata import version; print(version('qpots'))"
 
-    pip install matlabengine==23.2.1
+Optional dependencies
+---------------------
+
+Plots and data analysis in the examples require Matplotlib and pandas:
+
+.. code-block:: console
+
+   python -m pip install "qpots[examples]"
+
+MPI-based high-performance-computing examples additionally require ``mpi4py``:
+
+.. code-block:: console
+
+   python -m pip install "qpots[hpc]"
+
+The MATLAB Engine is needed only for the optional TS-EMO baseline. Core qPOTS,
+the BoTorch-based acquisition functions, and the tutorials do not require
+MATLAB. Install the engine version matching the local MATLAB release by
+following the `MathWorks installation guide
+<https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html>`_.
+For example, MATLAB R2023b uses:
+
+.. code-block:: console
+
+   python -m pip install matlabengine==23.2.1
+
+Install from source
+-------------------
+
+To work with the current repository version:
+
+.. code-block:: console
+
+   git clone https://github.com/csdlpsu/qpots.git
+   cd qpots
+   python -m pip install .
+
+For development, install the package in editable mode with its test and
+documentation tools:
+
+.. code-block:: console
+
+   python -m pip install -e ".[test,docs]"
+   python -m pytest -q tests/
+
+Hardware and precision
+----------------------
+
+qPOTS uses CUDA when PyTorch detects an available GPU and otherwise uses the
+CPU. The default floating-point type is ``torch.float64``. Runtime settings can
+be changed without editing the installed package:
+
+.. code-block:: python
+
+   import torch
+   from qpots import RuntimeConfig, set_default_runtime
+
+   set_default_runtime(RuntimeConfig(device="cpu", dtype=torch.float64))
+
+An object's explicit ``device`` or ``dtype`` argument takes precedence over
+the package-wide default. See :doc:`qpots_config` for the complete API.
+
+Next step
+---------
+
+Continue to :doc:`getting_started` for a complete optimization run.

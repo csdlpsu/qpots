@@ -42,7 +42,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test,docs]"
 ```
 
-qPOTS currently supports Python 3.10 and 3.11. The core qPOTS package does not require MATLAB. MATLAB Engine is only needed for users who want to run the bundled TS-EMO baseline.
+qPOTS requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, and 3.13. The core qPOTS package does not require MATLAB. MATLAB Engine is only needed for users who want to run the bundled TS-EMO baseline.
 
 ## Running Tests
 
@@ -53,6 +53,21 @@ python -m pytest tests/
 ```
 
 The tests should pass without MATLAB installed. Tests for TS-EMO wrapper behavior use mocks so the core CI workflow remains available to Python-only contributors.
+
+For the complete pull-request acceptance sequence, also run:
+
+```bash
+python -m ruff check .
+python -m ruff format --check .
+python -m compileall -q examples
+python -m sphinx -W -b html docs/source docs/build/html
+python -m build --sdist --wheel
+python -m twine check dist/*
+python tools/verify_distribution.py dist
+```
+
+See [ACCEPTANCE.md](ACCEPTANCE.md) for the acceptance criteria, CI mapping,
+optional-integration boundaries, and release gate.
 
 ## Building Documentation
 
@@ -76,6 +91,17 @@ Please open pull requests against the `main` branch. A good pull request should:
 - preserve compatibility with the supported Python versions unless the change explicitly updates support policy.
 
 Small, focused pull requests are easier to review than broad changes that mix bug fixes, refactoring, documentation, and new features.
+
+## Maintainer Release Process
+
+Releases use semantic `vX.Y.Z` tags. Before tagging a release:
+
+1. Update the version in `pyproject.toml` and `docs/source/conf.py`.
+2. Rename the `Unreleased` changelog section to the same `vX.Y.Z` tag and add a new empty `Unreleased` section above it.
+3. Merge the change into `main` and confirm that CI passes.
+4. Create and push the matching tag, for example `git tag v2.1.0` followed by `git push origin v2.1.0`.
+
+The release workflow verifies that the tag, package version, and changelog agree; runs the test and style suites; builds and checks the distributions; publishes to PyPI through the `pypi` environment's trusted-publisher configuration; and creates a GitHub Release with the matching changelog notes and distribution files. No long-lived PyPI token is stored in the repository.
 
 ## Code Style
 

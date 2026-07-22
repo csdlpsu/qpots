@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install test and build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[test,docs]" build twine
+
+      - name: Validate version and prepare release notes
+        run: |
+          python tools/extract_release_notes.py \
+            --tag "${GITHUB_REF_NAME}" \
+            --pyproject pyproject.toml \
+            --changelog CHANGELOG.md \
+            --output release-notes.md
+
+      - name: Run tests and style checks
+        run: |
+          python -m pytest -q tests/
+          python -m ruff check .
+          python -m ruff format --check .
+          python -m compileall -q examples
+
+      - name: Build documentation without warnings
+        run: python -m sphinx -W -b html docs/source docs/build/html
+
+      - name: Build and check distributions
+        run: |
+          python -m build --sdist --wheel
+          python -m twine check dist/*
+          python tools/verify_distribution.py dist
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            dist/*
+            release-notes.md
+          if-no-files-found: error
+
+  publish-pypi:
+    needs: verify-and-build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  publish-github-release:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: dist/*

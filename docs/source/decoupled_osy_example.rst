@@ -1,72 +1,66 @@
-Decoupled OSY Example
+Decoupled OSY example
 =====================
 
-This example demonstrates how to run **qPOTS** with decoupled evaluations on
-the constrained **OSY** benchmark.
+This executable example applies :doc:`qpots_doe` to the constrained OSY
+benchmark. OSY has six design variables, two objectives, and six inequality
+constraints, giving eight output oracles in total.
 
-OSY has two objectives and six inequality constraints. In a coupled workflow,
-every candidate is evaluated against all eight outputs. In a decoupled
-workflow, qPOTS can select which objectives or constraints to query at each
-candidate, reducing unnecessary oracle calls when outputs come from separate
-simulators, experiments, or analyses.
+Why OSY is useful here
+----------------------
 
-Overview
---------
+A coupled batch of two designs requires 16 scalar oracle evaluations. In
+qPOTS-Decoupled mode, the acquisition returns a task subset for each design. Values
+from tasks outside that subset are stored as ``NaN`` and excluded from the next
+multitask Gaussian-process fit.
 
-- Optimizes the **6-dimensional OSY problem** with **2 objectives** and
-  **6 constraints**.
-- Uses a **MultiTaskGP** so objectives and constraints are modeled jointly.
-- Enables decoupled selection with ``partial_info=1``.
-- Stores missing task evaluations as ``NaN`` and refits the multitask model
-  with partially observed data.
-- Tracks true hypervolume from fully observed bookkeeping data.
-- Fills missing values with multitask posterior means for downstream analysis.
-
-Key Settings
-------------
-
-The important decoupled-evaluation settings are:
+Key configuration
+-----------------
 
 .. code-block:: python
 
-   "mt": 1,
-   "partial_info": 1,
-   "threshold": 1e-4,
+   config = QPOTSConfig(
+       n_initial=60,
+       iterations=50,
+       batch_size=2,
+       n_constraints=6,
+       generations=20,
+       multitask=True,
+       partial_evaluations=True,
+       correlation_threshold=1e-4,
+       seed=1023,
+   )
 
-``mt=1`` enables the joint multitask model. ``partial_info=1`` tells qPOTS to
-return both candidate points and the selected task indices. ``threshold``
-controls the total-correlation gate used to decide when to query only a subset
-of outputs; use ``None`` to decouple unconditionally.
+The multitask model shares information across all eight outputs.
+``partial_evaluations`` enables output selection, while
+``correlation_threshold`` activates the total-correlation gate and
+mutual-information subset rule.
 
-Script Details
---------------
+Complete script
+---------------
 
 .. literalinclude:: ../../examples/decoupled_osy_example.py
    :language: python
    :linenos:
    :caption: decoupled_osy_example.py
 
-Example Output
---------------
+The callback reports how many scalar outputs were retained from each possible
+16-output batch. The saved ``osy_partial_train_y.pt`` tensor contains objective
+columns first and constraint columns second, with ``NaN`` at unobserved tasks.
+
+Run the example
+---------------
 
 .. code-block:: console
 
-   Initial hypervolume: 0.0000
-   Iteration   0 | oracles queried: 8/16 | time: 1.43s | HV: 0.0000
-   Iteration   1 | oracles queried: 10/16 | time: 1.37s | HV: 12.4815
-   ...
-   Optimization complete.
-   Final hypervolume: 52.7342
-   train_y shape (with NaNs filled): torch.Size([160, 8])
-
-Usage
------
-
-Run the script locally with:
-
-.. code-block:: sh
-
    python examples/decoupled_osy_example.py
 
-This example is more computationally expensive than the basic examples because
-it refits a multitask Gaussian process after each partially observed batch.
+This example is substantially more expensive than the introductory examples
+because it refits a joint multitask Gaussian process after every partially
+observed batch. Reduce ``n_initial``, ``iterations``, and ``generations`` while
+validating a local environment.
+
+The built-in OSY function is fully evaluated for benchmark bookkeeping, but
+only selected values enter model training. See :ref:`Benchmarking versus real
+oracle calls <benchmarking-versus-real-oracle-calls>` for the distinction
+between this emulation and an external workflow that avoids unselected oracle
+calls entirely.

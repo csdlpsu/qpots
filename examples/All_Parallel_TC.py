@@ -2,6 +2,7 @@ from __future__ import annotations
 """
 This example demonstrates how to use qPOTS on a BoTorch multiobjective test function called BraninCurrin.
 This is not an HPC implementation.
+Install MPI support with ``pip install qpots[hpc]``.
 """
 import warnings
 import os

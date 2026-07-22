@@ -1,9 +1,9 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
-qpots = ["TS-EMO/**/*"]  # Ensures all files in TS-EMO are included
+qpots = ["py.typed", "TS-EMO/**/*"]  # Include typing marker and bundled TS-EMO files
 
 [tool.setuptools.exclude-package-data]
 qpots = [
@@ -28,26 +28,75 @@ authors = [
 ]
 description = "A BoTorch wrapper for solving multiobjective optimization problems with an implementation of the qPOTS algorithm."
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: OS Independent",
 ]
-license = { file = "LICENSE" }
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = [
     "botorch>=0.16.1",
     "torch>=2.12.0",
     "gpytorch>=1.14.2",
-    "numpy>=2.2.6,<3",
+    "numpy>=2.2.6",
     "scipy>=1.15.3",
     "pymoo>=0.6.1.6",
     "scikit-learn>=1.7.2",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=9.0.3"]
+test = [
+    "pytest>=9.0.3",
+    "ruff>=0.12",
+]
 docs = ["sphinx", "sphinx-rtd-theme"]
+examples = ["matplotlib", "pandas"]
+hpc = ["mpi4py"]
 
 [project.urls]
 Homepage = "https://github.com/csdlpsu/qpots"
+Documentation = "https://qpots.readthedocs.io/en/latest/"
 Issues = "https://github.com/csdlpsu/qpots/issues"
+Changelog = "https://github.com/csdlpsu/qpots/blob/main/CHANGELOG.md"
+Releases = "https://github.com/csdlpsu/qpots/releases"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+include = [
+    "qpots/__init__.py",
+    "qpots/acquisition.py",
+    "qpots/benchmark_registry.py",
+    "qpots/config.py",
+    "qpots/function.py",
+    "qpots/model_object.py",
+    "qpots/runner.py",
+    "qpots/tsemo_runner.py",
+    "tests/test_config.py",
+    "tests/test_compatibility.py",
+    "tests/test_acquisition_readability.py",
+    "tests/test_function.py",
+    "tests/test_packaging.py",
+    "tests/test_public_api.py",
+    "tests/test_release_notes.py",
+    "tests/test_distribution.py",
+    "tests/test_runner.py",
+    "tools/extract_release_notes.py",
+    "tools/verify_distribution.py",
+    "examples/constrained_example.py",
+    "examples/constrained_branin_currin_tutorial.py",
+    "examples/custom_function_example.py",
+    "examples/decoupled_osy_example.py",
+    "examples/unconstrained_branin.py",
+]
+extend-exclude = ["qpots/TS-EMO"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
