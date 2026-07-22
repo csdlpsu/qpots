@@ -122,6 +122,9 @@ existing module imports used by qPOTS 2.0 scripts remain supported. See the
 [API compatibility policy](https://qpots.readthedocs.io/en/latest/api_compatibility.html)
 for the supported surface, migration guidance, and deprecation policy.
 
+The repository's [test and acceptance plan](ACCEPTANCE.md) defines the checks
+required for pull requests and releases.
+
 ## Main Reference
 
 The main reference for this repository is the AISTATS 2025 paper:

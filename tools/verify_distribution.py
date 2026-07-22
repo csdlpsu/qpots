@@ -74,12 +74,15 @@ def verify_sdist(path: Path) -> None:
             if PurePosixPath(name).name == "PKG-INFO" and len(PurePosixPath(name).parts) == 2
         ]
         verifier_names = [name for name in names if name.endswith("/tools/verify_distribution.py")]
+        acceptance_names = [name for name in names if name.endswith("/ACCEPTANCE.md")]
         if len(typed_names) != 1:
             raise ValueError(f"{path.name}: qpots/py.typed is missing")
         if len(metadata_names) != 1:
             raise ValueError(f"{path.name}: expected exactly one PKG-INFO file")
         if len(verifier_names) != 1:
             raise ValueError(f"{path.name}: distribution verifier is missing")
+        if len(acceptance_names) != 1:
+            raise ValueError(f"{path.name}: acceptance plan is missing")
         metadata_file = archive.extractfile(metadata_names[0])
         if metadata_file is None:
             raise ValueError(f"{path.name}: could not read PKG-INFO")

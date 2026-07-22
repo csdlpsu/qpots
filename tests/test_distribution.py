@@ -40,6 +40,7 @@ def _write_sdist(path: Path, *, include_requirements: bool = False) -> None:
         "qpots-2.1.0/PKG-INFO": METADATA,
         "qpots-2.1.0/qpots/py.typed": b"",
         "qpots-2.1.0/tools/verify_distribution.py": b"",
+        "qpots-2.1.0/ACCEPTANCE.md": b"",
     }
     if include_requirements:
         members["qpots-2.1.0/requirements.txt"] = b"torch"

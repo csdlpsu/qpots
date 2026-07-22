@@ -54,6 +54,21 @@ python -m pytest tests/
 
 The tests should pass without MATLAB installed. Tests for TS-EMO wrapper behavior use mocks so the core CI workflow remains available to Python-only contributors.
 
+For the complete pull-request acceptance sequence, also run:
+
+```bash
+python -m ruff check .
+python -m ruff format --check .
+python -m compileall -q examples
+python -m sphinx -W -b html docs/source docs/build/html
+python -m build --sdist --wheel
+python -m twine check dist/*
+python tools/verify_distribution.py dist
+```
+
+See [ACCEPTANCE.md](ACCEPTANCE.md) for the acceptance criteria, CI mapping,
+optional-integration boundaries, and release gate.
+
 ## Building Documentation
 
 Build the Sphinx documentation locally with:
