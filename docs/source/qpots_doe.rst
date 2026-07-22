@@ -7,6 +7,13 @@ qPOTS-Decoupled
    **decoupled oracle evaluations**. The preferred name is now
    **qPOTS-Decoupled** to avoid confusion with design of experiments.
 
+The task-correlation gate and oracle-subset rule are described in the companion
+methods manuscript, *qPOTS-DOE: Batch Pareto Optimal Thompson Sampling with
+Decoupled Oracle Evaluations for Constrained Multiobjective Bayesian
+Optimization* (Renganathan, Carlson, and Bachman, manuscript under review).
+This guide focuses on using the implemented interfaces. A persistent preprint
+link will be added here when the companion manuscript becomes public.
+
 What is an oracle?
 ------------------
 
