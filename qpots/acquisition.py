@@ -35,6 +35,7 @@ from torch import Tensor
 from qpots.config import RuntimeConfig, as_tensor, resolve_runtime, tensor_kwargs, to_runtime
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
+from qpots.utils._constraints import penalize_infeasible_objectives
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.utils.utils import (
     select_candidates,
@@ -213,10 +214,7 @@ class Acquisition:
         Ys_ = unstandardize(torch.cat(samples_list, -1), gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            ind_feasible = Ys_[..., -self.ncons :] <= 0
-            Ys_[
-                ~ind_feasible.squeeze(), : self.nobj
-            ] = -1e12  # Arbitrary low value for infeasible points
+            Ys_ = penalize_infeasible_objectives(Ys_, self.nobj, self.ncons)
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
@@ -252,8 +250,7 @@ class Acquisition:
         Ys_ = unstandardize(torch.cat(Ys_, -1), gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
-            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
+            Ys_ = penalize_infeasible_objectives(Ys_, self.nobj, self.ncons)
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
@@ -293,8 +290,7 @@ class Acquisition:
         sampled_values = unstandardize_ignore_nan(standardized_samples, gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            feasible = (sampled_values[..., -self.ncons :] >= 0).all(dim=-1)
-            sampled_values[~feasible.squeeze(), : self.nobj] = -1e12
+            sampled_values = penalize_infeasible_objectives(sampled_values, self.nobj, self.ncons)
             objective_samples = sampled_values[..., : self.nobj]
         else:
             objective_samples = sampled_values

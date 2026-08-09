@@ -31,6 +31,7 @@ from botorch.fit import fit_gpytorch_mll
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.sampling import SobolQMCNormalSampler
 from qpots.config import as_tensor
+from qpots.utils._constraints import penalize_infeasible_objectives
 
 def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
     """
@@ -237,10 +238,7 @@ def get_model_identified_hv_maximizing_set(
 
             ## Constraint Handling
             if ncons > 0:
-
-                #penalizing constraint violation
-                ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
-                y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
+                y = penalize_infeasible_objectives(y, problem.nobj, ncons)
                 f = y[..., : problem.nobj]
 
             else:

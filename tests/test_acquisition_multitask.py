@@ -1,3 +1,5 @@
+from unittest.mock import Mock, patch
+
 import pytest
 import torch
 import os
@@ -113,6 +115,44 @@ def test_mt_gp_posterior_seed_reproducibility(mtgp_gps, branincurrin_func):
     r1 = acq._mt_gp_posterior(x, mtgp_gps, seed_iter=99)
     r2 = acq._mt_gp_posterior(x, mtgp_gps, seed_iter=99)
     assert torch.allclose(r1, r2), "_mt_gp_posterior must be deterministic for the same seed"
+
+
+@patch("qpots.acquisition.unstandardize_ignore_nan", side_effect=lambda values, _train_y: values)
+def test_mt_gp_posterior_preserves_sample_dimension_with_constraints(_unstandardize):
+    func = Mock(dim=2)
+    gps = Mock()
+    gps.nobj = 2
+    gps.ncons = 2
+    gps.bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.float64)
+    gps.train_y = torch.zeros(3, 4, dtype=torch.float64)
+
+    sampled_values = torch.tensor(
+        [
+            [
+                [1.0, 2.0, 0.0, 0.5],
+                [3.0, 4.0, -0.1, 1.0],
+                [5.0, 6.0, 1.0, 1.0],
+            ]
+        ],
+        dtype=torch.float64,
+    )
+    posterior = Mock()
+    posterior.sample.return_value = sampled_values
+    model = Mock()
+    model.posterior.return_value = posterior
+    gps.models = [model]
+
+    acquisition = Acquisition(func=func, gps=gps, device="cpu", dtype=torch.float64)
+    result = acquisition._mt_gp_posterior(
+        torch.tensor([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]], dtype=torch.float64),
+        gps,
+    )
+
+    expected = torch.tensor(
+        [[[-1.0, -2.0], [1e12, 1e12], [-5.0, -6.0]]], dtype=torch.float64
+    )
+    assert result.shape == (1, 3, 2)
+    assert torch.equal(result, expected)
 
 
 # ---------------------------------------------------------------------------

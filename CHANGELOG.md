@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixes constraint handling for multitask and Nyström posterior sampling,
+  constrained posterior-mean hypervolume reporting, and multitask missing-value
+  imputation.
+
 ## v2.1.0
 
 - Adds injectable runtime configuration, extensible function evaluation, and a typed high-level optimization runner.

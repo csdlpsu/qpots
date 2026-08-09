@@ -887,15 +887,20 @@ def posterior_mean_fill(gps: ModelObject):
         A tensor of the same shape as `gps.train_y` with NaNs replaced by the
         posterior mean for each missing entry.
     """
-    mtgp=gps.models[0]
+    mtgp = gps.models[0]
     full_train_y = gps.train_y.clone().detach()
-    for m in range(gps.nobj+gps.ncons):
+    for m in range(gps.nobj + gps.ncons):
         missing_mask = torch.isnan(full_train_y[:, m])
         if missing_mask.any():
             X_missing = gps.train_x[missing_mask]
-            task_idx = torch.full((X_missing.shape[0], 1), m, dtype=torch.long, device=gps.train_x.device)
+            task_idx = torch.full(
+                (X_missing.shape[0], 1),
+                m,
+                dtype=torch.long,
+                device=gps.train_x.device,
+            )
             posterior = mtgp.posterior(torch.cat([X_missing, task_idx], dim=-1))
-            full_train_y[missing_mask, m] = posterior.mean[:, m]
+            full_train_y[missing_mask, m] = posterior.mean.squeeze(-1)
             
     return full_train_y
 

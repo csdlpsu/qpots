@@ -51,21 +51,16 @@ def mtgp_gps(branincurrin_func):
 
 @pytest.fixture(scope="module")
 def mtgp_gps_with_nan(branincurrin_func):
-    """ModelObject with a fitted MultiTaskGP where the last 4 rows have NaN in col 0.
-
-    NaN is placed in column 0 (not column 1) to work around a known bug in
-    posterior_mean_fill: it accesses posterior.mean[:, m] but the posterior has
-    shape (n, 1) for a single-task query, so m must be 0 to avoid IndexError.
-    """
+    """ModelObject with a fitted MultiTaskGP where the last 4 rows have NaN in col 1."""
     torch.manual_seed(5)
     n_full, n_partial = 12, 4
     n = n_full + n_partial
     train_x = torch.rand(n, branincurrin_func.dim, dtype=torch.float64)
     train_y_full = branincurrin_func.evaluate(train_x[:n_full])
-    # partial rows: only obj1 observed; col 0 is NaN so fill uses posterior.mean[:, 0]
+    # Partial rows contain objective 0 but omit objective 1.
+    partial_obj0 = branincurrin_func.evaluate(train_x[n_full:])[:, :1]
     partial_nan = torch.full((n_partial, 1), float("nan"), dtype=torch.float64)
-    partial_obj1 = branincurrin_func.evaluate(train_x[n_full:])[:, 1:2]
-    train_y_partial = torch.cat([partial_nan, partial_obj1], dim=-1)
+    train_y_partial = torch.cat([partial_obj0, partial_nan], dim=-1)
     train_y = torch.cat([train_y_full, train_y_partial], dim=0)
     gps = ModelObject(
         train_x=train_x,
@@ -139,6 +134,7 @@ def test_posterior_mean_fill_no_nan_is_independent_copy(mtgp_gps):
 
 def test_posterior_mean_fill_removes_nan(mtgp_gps_with_nan):
     """After filling, the result must contain no NaN values."""
+    assert torch.isnan(mtgp_gps_with_nan.train_y[mtgp_gps_with_nan.ntrain :, 1]).all()
     filled = posterior_mean_fill(mtgp_gps_with_nan)
     assert not torch.isnan(filled).any(), (
         "posterior_mean_fill must replace all NaN entries with posterior means"
