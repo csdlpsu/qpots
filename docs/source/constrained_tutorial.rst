@@ -61,7 +61,7 @@ Run it from the repository root:
 
 .. code-block:: console
 
-   python examples/constrained_branin_currin_tutorial.py
+   python -m examples.constrained_branin_currin_tutorial
 
 It writes ``qpots_constrained_tutorial.png``. Because posterior sampling and
 evolutionary optimization are stochastic, exact candidates can differ across
@@ -73,7 +73,7 @@ For a quick end-to-end check, reduce the computational settings:
 
 .. code-block:: console
 
-   python examples/constrained_branin_currin_tutorial.py \
+   python -m examples.constrained_branin_currin_tutorial \
        --n-initial 8 --iterations 2 --batch-size 1 --generations 2 \
        --grid-size 40 --output qpots_constrained_quick.png
 

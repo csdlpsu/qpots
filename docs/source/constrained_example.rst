@@ -35,8 +35,16 @@ Run the example
 
 .. code-block:: console
 
-   python examples/constrained_example.py
+   python -m examples.constrained_example
 
-qPOTS considers a constraint feasible when its value is nonnegative. For a
+For the reviewer-sized end-to-end reproduction on CPU, use:
+
+.. code-block:: console
+
+   python -m examples.constrained_example --quick --output-dir /tmp/qpots-weldedbeam
+
+The output tensor has two objective columns followed by four constraint
+columns. A row is feasible only when **all four** constraint values are
+nonnegative. For a
 guided two-dimensional constrained workflow and visualization, see
 :doc:`constrained_tutorial`.

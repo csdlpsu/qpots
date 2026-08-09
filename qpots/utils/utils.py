@@ -361,13 +361,15 @@ def corr_and_total_correlation(
     # Stabilize and compute logdet via Cholesky: logdet(R) = 2 * sum(log(diag(L)))
     m = R.shape[-1]
     eye = torch.eye(m, device=R.device, dtype=R.dtype).expand(R.shape[:-2] + (m, m))
-    Rj = R + jitter * eye
+    # Preserve a unit diagonal after stabilization so independent tasks have
+    # zero, rather than negative, total correlation.
+    Rj = (R + jitter * eye) / (1.0 + jitter)
 
     L = torch.linalg.cholesky(Rj)
     logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
 
     with torch.no_grad():
-        TC = -0.5 * logdet
+        TC = (-0.5 * logdet).clamp_min(0.0)
     return R, TC
 
 

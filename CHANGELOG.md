@@ -5,6 +5,12 @@
 - Fixes constraint handling for multitask and Nyström posterior sampling,
   constrained posterior-mean hypervolume reporting, and multitask missing-value
   imputation.
+- Adds reproducible constrained, decoupled, and custom engineering examples,
+  including feasible-front and hypervolume visualizations.
+- Stabilizes total-correlation calculations without producing negative values
+  for independent output tasks.
+- Pins the test runtime to CPU and replaces the bundled TS-EMO sources with an
+  optional external-checkout integration through ``tsemo_path``.
 
 ## v2.1.0
 

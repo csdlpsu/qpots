@@ -52,7 +52,13 @@ Run the example
 
 .. code-block:: console
 
-   python examples/decoupled_osy_example.py
+   python -m examples.decoupled_osy_example
+
+The configuration used to reproduce the constraint-handling review report is:
+
+.. code-block:: console
+
+   python -m examples.decoupled_osy_example --quick --output-dir /tmp/qpots-osy
 
 This example is substantially more expensive than the introductory examples
 because it refits a joint multitask Gaussian process after every partially
@@ -64,3 +70,8 @@ only selected values enter model training. See :ref:`Benchmarking versus real
 oracle calls <benchmarking-versus-real-oracle-calls>` for the distinction
 between this emulation and an external workflow that avoids unselected oracle
 calls entirely.
+
+The saved output order is always two objectives followed by six constraints.
+When a complete row is available, it is feasible only if every constraint is
+greater than or equal to zero. ``NaN`` denotes an output that was not queried;
+it is not a feasibility value.

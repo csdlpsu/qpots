@@ -46,6 +46,7 @@ evaluations.
    unconstrained_example
    constrained_example
    decoupled_osy_example
+   custom_engineering_example
 
 .. toctree::
    :maxdepth: 1
@@ -56,7 +57,6 @@ evaluations.
    qpots_function
    qpots_model_object
    qpots_runner
-   qpots_ts_emo_wrappers
    qpots_tsemo_runner
    qpots_utils_acq_utils
    qpots_utils_pymoo_problem

@@ -34,7 +34,7 @@ Run the example
 
 .. code-block:: console
 
-   python examples/unconstrained_branin.py
+   python -m examples.unconstrained_branin
 
 Reduce ``iterations`` and ``generations`` for a quick local check. For a
 line-by-line introduction to the same workflow, see :doc:`getting_started`.
