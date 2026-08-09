@@ -1,134 +1,105 @@
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
 import pytest
 import torch
-import numpy as np
-import os
-from unittest.mock import Mock, patch, MagicMock
-import warnings
-import sys
-warnings.filterwarnings('ignore')
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from qpots.tsemo_runner import TSEMORunner
 
+
 @pytest.fixture
-def tsemo_runner():
-    with patch("matlab.engine.start_matlab", return_value=Mock()) as mock_engine:
-        runner = TSEMORunner(
+def tsemo_path(tmp_path):
+    """Create the directory shape expected from an external TS-EMO checkout."""
+    (tmp_path / "TSEMO_run.m").touch()
+    for relative in (
+        "Test_functions",
+        "Direct",
+        "Mex_files/invchol",
+        "Mex_files/hypervolume",
+        "Mex_files/pareto front",
+        "NGPM_v1.4",
+    ):
+        (tmp_path / relative).mkdir(parents=True)
+    return tmp_path
+
+
+@pytest.fixture
+def tsemo_runner(tsemo_path):
+    with patch("matlab.engine.start_matlab", return_value=Mock()):
+        return TSEMORunner(
             func="test_function",
             x=torch.tensor([[0.1, 0.2], [0.3, 0.4]]),
             y=torch.tensor([[1.0, 2.0], [3.0, 4.0]]),
             lb=[0, 0],
             ub=[1, 1],
             iters=5,
-            batch_number=2
+            batch_number=2,
+            tsemo_path=tsemo_path,
         )
-        return runner
 
-def test_tsemo_runner_init(tsemo_runner):
+
+def test_tsemo_path_is_required():
+    with pytest.raises(ValueError, match="no longer redistributes"):
+        TSEMORunner("test", [], [], [], [], 1, 1)
+
+
+def test_tsemo_path_is_validated_before_matlab_starts(tmp_path):
+    with patch("matlab.engine.start_matlab") as start_matlab:
+        with pytest.raises(FileNotFoundError, match="TSEMO_run.m"):
+            TSEMORunner("test", [], [], [], [], 1, 1, tsemo_path=tmp_path)
+    start_matlab.assert_not_called()
+
+
+def test_tsemo_runner_init(tsemo_runner, tsemo_path):
     assert tsemo_runner._func == "test_function"
-    assert len(tsemo_runner._x) == 2
-    assert len(tsemo_runner._y) == 2
+    assert tsemo_runner._tsemo_path == tsemo_path.resolve()
     assert tsemo_runner._iters == 5
     assert tsemo_runner._batch_number == 2
-    assert isinstance(tsemo_runner._eng, Mock)  # MATLAB engine should be mocked
+    assert isinstance(tsemo_runner._eng, Mock)
+    assert tsemo_runner._eng.addpath.call_count == 7
+
 
 def test_tsemo_run(tsemo_runner, tmp_path):
-    mock_X_out = [[0.5, 0.6], [0.7, 0.8]]
-    mock_Y_out = [[5.0, 6.0], [7.0, 8.0]]
+    mock_x = [[0.5, 0.6], [0.7, 0.8]]
+    mock_y = [[5.0, 6.0], [7.0, 8.0]]
     mock_times = [0.1, 0.2]
+    tsemo_runner._eng.TSEMO_run = MagicMock(return_value=(mock_x, mock_y, mock_times))
 
-    tsemo_runner._eng.TSEMO_run = MagicMock(return_value=(mock_X_out, mock_Y_out, mock_times))
+    x, y, times = tsemo_runner.tsemo_run(tmp_path, rep=1)
 
-    save_dir = tmp_path  # Temporary directory for testing file saving
-    rep = 1
-
-    X, Y, times_np = tsemo_runner.tsemo_run(save_dir, rep)
-
-    # Ensure the MATLAB function was called correctly
     tsemo_runner._eng.TSEMO_run.assert_called_once()
-
-    # Verify returned values
-    assert isinstance(X, np.ndarray)
-    assert isinstance(Y, np.ndarray)
-    assert isinstance(times_np, np.ndarray)
-    assert X.shape == (2, 2)
-    assert Y.shape == (2, 2)
-
-    # Check that files were saved correctly
-    assert (save_dir / "X_1.npy").exists()
-    assert (save_dir / "Y_1.npy").exists()
-    assert (save_dir / "times_1.npy").exists()
-
-    # Check file contents
-    np.testing.assert_array_equal(np.load(save_dir / "X_1.npy"), np.array(mock_X_out))
-    np.testing.assert_array_equal(np.load(save_dir / "Y_1.npy"), np.array(mock_Y_out))
-    np.testing.assert_array_equal(np.load(save_dir / "times_1.npy"), np.array(mock_times))
-
-def _make_matlab_mock():
-    """Return a Mock that satisfies TSEMORunner.__init__'s matlab.engine.start_matlab() call."""
-    matlab_mock = Mock()
-    matlab_mock.engine.start_matlab.return_value = Mock()
-    return matlab_mock
+    np.testing.assert_array_equal(x, np.array(mock_x))
+    np.testing.assert_array_equal(y, np.array(mock_y))
+    np.testing.assert_array_equal(times, np.array(mock_times))
+    np.testing.assert_array_equal(np.load(tmp_path / "X_1.npy"), np.array(mock_x))
+    np.testing.assert_array_equal(np.load(tmp_path / "Y_1.npy"), np.array(mock_y))
+    np.testing.assert_array_equal(np.load(tmp_path / "times_1.npy"), np.array(mock_times))
 
 
-def test_tsemo_hypervolume():
-    Y = torch.tensor([[1.0, 2.0], [2.0, 1.5], [1.5, 1.8], [3.0, 2.5]])
-    ref_point = torch.tensor([4.0, 4.0])
-    train_shape = 2
-    iters = 2
+@pytest.mark.parametrize("iterations", [2, 4])
+def test_tsemo_hypervolume_is_non_decreasing(tsemo_runner, iterations):
+    outcomes = torch.tensor(
+        [
+            [-1.0, -2.0],
+            [-2.0, -1.5],
+            [-1.5, -1.8],
+            [-3.0, -2.5],
+            [-2.8, -2.0],
+            [-1.2, -3.0],
+        ],
+        dtype=torch.float64,
+    )
+    hypervolume, pareto_front = tsemo_runner.tsemo_hypervolume(
+        outcomes,
+        ref_point=torch.tensor([-4.0, -4.0]),
+        train_shape=2,
+        iters=iterations,
+    )
 
-    with patch("qpots.tsemo_runner.matlab", _make_matlab_mock(), create=True):
-        tsemo_runner = TSEMORunner(
-            func="test_function",
-            x=[],
-            y=[],
-            lb=[],
-            ub=[],
-            iters=iters,
-            batch_number=1
-        )
-
-    hv, pf = tsemo_runner.tsemo_hypervolume(Y, ref_point, train_shape, iters)
-
-    assert isinstance(hv, list), "Hypervolume should be a list"
-    assert len(hv) == iters, "Hypervolume list length mismatch"
-    assert isinstance(pf, torch.Tensor), "Pareto front should be a tensor"
-    assert pf.shape[1] == 2, "Pareto front shape mismatch"
-
-
-# ---------------------------------------------------------------------------
-# Tests added for improved coverage
-# ---------------------------------------------------------------------------
-
-def test_tsemo_hypervolume_multi_iteration():
-    """tsemo_hypervolume accumulates one HV entry per iteration and HV is non-decreasing."""
-    # Negative Y values (as would come from a negated BoTorch function).
-    # After negation inside tsemo_hypervolume the points become positive and dominate ref.
-    Y = torch.tensor([
-        [-1.0, -2.0], [-2.0, -1.5], [-1.5, -1.8],
-        [-3.0, -2.5], [-2.8, -2.0], [-1.2, -3.0],
-    ], dtype=torch.float64)
-    ref_point = torch.tensor([-4.0, -4.0])  # worse than all -Y values
-    train_shape = 2
-    iters = 4  # produces HV for slices [:2], [:3], [:4], [:5]
-
-    with patch("qpots.tsemo_runner.matlab", _make_matlab_mock(), create=True):
-        runner = TSEMORunner(
-            func="test_function",
-            x=[], y=[], lb=[], ub=[],
-            iters=iters, batch_number=1,
-        )
-
-    hv, pf = runner.tsemo_hypervolume(Y, ref_point, train_shape, iters)
-
-    assert isinstance(hv, list)
-    assert len(hv) == iters, "Must return one HV value per iteration"
-    assert all(float(v) >= 0 for v in hv), "All hypervolume values must be non-negative"
-    # Adding more points can only maintain or improve hypervolume
-    for i in range(1, len(hv)):
-        assert float(hv[i]) >= float(hv[i - 1]) - 1e-8, (
-            f"Hypervolume decreased at iteration {i}: "
-            f"{float(hv[i-1]):.6f} → {float(hv[i]):.6f}"
-        )
-    assert isinstance(pf, torch.Tensor)
-    assert pf.shape[1] == 2
+    assert len(hypervolume) == iterations
+    assert all(float(value) >= 0 for value in hypervolume)
+    assert all(
+        float(current) >= float(previous) - 1e-8
+        for previous, current in zip(hypervolume, hypervolume[1:], strict=False)
+    )
+    assert pareto_front.shape[1] == 2

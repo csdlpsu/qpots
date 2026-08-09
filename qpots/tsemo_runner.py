@@ -1,6 +1,7 @@
-import os
 import sys
 import types
+from os import PathLike
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -49,6 +50,7 @@ class TSEMORunner:
         ub: list,
         iters: int,
         batch_number: int,
+        tsemo_path: str | PathLike[str] | None = None,
     ):
         """
         Initialize the TS-EMO runner.
@@ -69,12 +71,16 @@ class TSEMORunner:
             The number of optimization iterations.
         batch_number : int
             The number of candidates to generate per iteration.
+        tsemo_path : str or path-like, optional
+            Path to a separately obtained TS-EMO checkout containing
+            ``TSEMO_run.m``. qPOTS does not redistribute the MATLAB source.
 
         Raises
         ------
         ImportError
             If MATLAB is not available or the MATLAB Engine API is not installed.
         """
+        self._tsemo_path = self._validate_tsemo_path(tsemo_path)
         self._func = func
         self._x = x
         self._y = y
@@ -84,27 +90,45 @@ class TSEMORunner:
         self._batch_number = batch_number
         self._eng = matlab.engine.start_matlab()
 
-        # Get the directory of the current script (which is inside qpots)
-        qpots_dir = os.path.dirname(os.path.abspath(__file__))
-        ts_emo_dir = os.path.join(qpots_dir, "TS-EMO")
-
         # Define TS-EMO subdirectories
         ts_emo_paths = [
-            ts_emo_dir,
-            os.path.join(ts_emo_dir, "Test_functions"),
-            os.path.join(ts_emo_dir, "Direct"),
-            os.path.join(ts_emo_dir, "Mex_files/invchol"),
-            os.path.join(ts_emo_dir, "Mex_files/hypervolume"),
-            os.path.join(ts_emo_dir, "Mex_files/pareto front"),
-            os.path.join(ts_emo_dir, "NGPM_v1.4"),
+            self._tsemo_path,
+            self._tsemo_path / "Test_functions",
+            self._tsemo_path / "Direct",
+            self._tsemo_path / "Mex_files" / "invchol",
+            self._tsemo_path / "Mex_files" / "hypervolume",
+            self._tsemo_path / "Mex_files" / "pareto front",
+            self._tsemo_path / "NGPM_v1.4",
         ]
 
         # Add paths to MATLAB
         for path in ts_emo_paths:
-            if os.path.exists(path):  # Ensure path exists before adding
-                self._eng.addpath(path, nargout=0)
-            else:
-                print(f"Warning: The path {path} does not exist.")
+            self._eng.addpath(str(path), nargout=0)
+
+    @staticmethod
+    def _validate_tsemo_path(tsemo_path: str | PathLike[str] | None) -> Path:
+        """Return a validated external TS-EMO root."""
+        if tsemo_path is None:
+            raise ValueError(
+                "tsemo_path is required because qPOTS no longer redistributes TS-EMO; "
+                "obtain an authorized checkout and pass its root directory explicitly"
+            )
+        root = Path(tsemo_path).expanduser().resolve()
+        required = (
+            root / "TSEMO_run.m",
+            root / "Test_functions",
+            root / "Direct",
+            root / "Mex_files" / "invchol",
+            root / "Mex_files" / "hypervolume",
+            root / "Mex_files" / "pareto front",
+            root / "NGPM_v1.4",
+        )
+        missing = [path.relative_to(root).as_posix() for path in required if not path.exists()]
+        if missing:
+            raise FileNotFoundError(
+                f"Invalid TS-EMO checkout at {root}: missing {', '.join(missing)}"
+            )
+        return root
 
     def tsemo_run(self, save_dir: str, rep: int):
         """

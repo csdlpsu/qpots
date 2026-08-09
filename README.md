@@ -28,7 +28,7 @@ Use $q\texttt{POTS}$ when you need to:
 - propose one or more candidates per Bayesian optimization iteration;
 - handle BoTorch benchmark functions or your own custom objectives;
 - compare $q\texttt{POTS}$ against common multiobjective acquisition strategies; or
-- run TS-EMO baselines when MATLAB Engine is available.
+- interoperate with a separately obtained TS-EMO checkout when MATLAB Engine is available.
 
 ## Installation
 
@@ -50,7 +50,11 @@ $q\texttt{POTS}$ requires Python 3.11 or newer and is continuously tested on Pyt
 
 ### Optional MATLAB Engine
 
-The MATLAB Engine is only needed if you plan to use the TS-EMO baseline included with this repository. $q\texttt{POTS}$ itself and the BoTorch-based acquisition functions do not require MATLAB.
+The MATLAB Engine is only needed for the optional TS-EMO interoperability layer.
+The TS-EMO MATLAB source is not bundled with or licensed by qPOTS; obtain an
+authorized checkout separately and pass its root as `tsemo_path`. $q\texttt{POTS}$
+itself and the BoTorch-based acquisition functions do not require MATLAB. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Install MATLAB Engine with the version that matches your local MATLAB installation. For example, MATLAB R2023b uses:
 
@@ -93,7 +97,8 @@ For complete scripts, see:
 - [Unconstrained Branin](examples/unconstrained_branin.py)
 - [Constrained optimization](examples/constrained_example.py)
 - [Decoupled optimization (OSY)](examples/decoupled_osy_example.py)
-- [Custom objective functions](examples/custom_function_example.py)
+- [Custom constrained cantilever design](examples/custom_function_example.py)
+- [qPOTS-Decoupled Figure 2 reproduction](examples/decoupled_branin_currin_figure.py)
 - [Multiple acquisition functions](examples/multiple_acquisitions_example.py)
 - [HPC-style runs](examples/hpc_example.py)
 

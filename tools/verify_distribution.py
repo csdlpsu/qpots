@@ -38,6 +38,12 @@ def _reject_dependency_manifests(names: list[str], source: str) -> None:
         raise ValueError(f"{source}: obsolete dependency manifests found: {forbidden}")
 
 
+def _reject_legacy_tsemo(names: list[str], source: str) -> None:
+    legacy = [name for name in names if "qpots/TS-EMO/" in name]
+    if legacy:
+        raise ValueError(f"{source}: bundled TS-EMO sources found: {legacy[:3]}")
+
+
 def verify_wheel(path: Path) -> None:
     """Validate wheel metadata and required package files."""
     if not path.is_file() or path.suffix != ".whl":
@@ -46,8 +52,11 @@ def verify_wheel(path: Path) -> None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         _reject_dependency_manifests(names, path.name)
+        _reject_legacy_tsemo(names, path.name)
         if "qpots/py.typed" not in names:
             raise ValueError(f"{path.name}: qpots/py.typed is missing")
+        if not any(name.endswith(".dist-info/licenses/THIRD_PARTY_NOTICES.md") for name in names):
+            raise ValueError(f"{path.name}: third-party notice is missing")
 
         metadata_names = [name for name in names if name.endswith(".dist-info/METADATA")]
         wheel_names = [name for name in names if name.endswith(".dist-info/WHEEL")]
@@ -67,6 +76,7 @@ def verify_sdist(path: Path) -> None:
     with tarfile.open(path, "r:gz") as archive:
         names = archive.getnames()
         _reject_dependency_manifests(names, path.name)
+        _reject_legacy_tsemo(names, path.name)
         typed_names = [name for name in names if name.endswith("/qpots/py.typed")]
         metadata_names = [
             name
@@ -75,6 +85,7 @@ def verify_sdist(path: Path) -> None:
         ]
         verifier_names = [name for name in names if name.endswith("/tools/verify_distribution.py")]
         acceptance_names = [name for name in names if name.endswith("/ACCEPTANCE.md")]
+        notice_names = [name for name in names if name.endswith("/THIRD_PARTY_NOTICES.md")]
         if len(typed_names) != 1:
             raise ValueError(f"{path.name}: qpots/py.typed is missing")
         if len(metadata_names) != 1:
@@ -83,6 +94,8 @@ def verify_sdist(path: Path) -> None:
             raise ValueError(f"{path.name}: distribution verifier is missing")
         if len(acceptance_names) != 1:
             raise ValueError(f"{path.name}: acceptance plan is missing")
+        if len(notice_names) != 1:
+            raise ValueError(f"{path.name}: third-party notice is missing")
         metadata_file = archive.extractfile(metadata_names[0])
         if metadata_file is None:
             raise ValueError(f"{path.name}: could not read PKG-INFO")

@@ -1,3 +1,4 @@
+from os import PathLike
 from typing import Callable, Optional
 
 import torch
@@ -699,7 +700,15 @@ class Acquisition:
         )
         return draw_sobol_samples(bounds=standard_bounds, n=1, q=self.q).squeeze(0).to(self.device)
 
-    def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int = 0):
+    def tsemo(
+        self,
+        save_dir: str,
+        iters: int,
+        ref_point: Tensor,
+        train_shape: int,
+        rep: int = 0,
+        tsemo_path: str | PathLike[str] | None = None,
+    ):
         """
         Perform Thompson Sampling Efficient Multiobjective Optimization (TS-EMO).
 
@@ -715,6 +724,9 @@ class Acquisition:
             The shape for determining the size of bounds.
         rep : int, optional
             The repetition of the experiment. Defaults to 0.
+        tsemo_path : str or path-like, optional
+            Root of a separately obtained TS-EMO checkout. Required when this
+            optional baseline is used.
 
         Returns
         -------
@@ -737,6 +749,7 @@ class Acquisition:
             ub=[1.0] * self.gps.train_x.shape[1],
             iters=iters,
             batch_number=self.q,
+            tsemo_path=tsemo_path,
         )
         x, y, times = ts.tsemo_run(save_dir, rep)
         hv, pf = ts.tsemo_hypervolume(y, ref_point, train_shape, iters)

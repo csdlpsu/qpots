@@ -26,24 +26,34 @@ Tag: py3-none-any
 """
 
 
-def _write_wheel(path: Path, *, include_typed: bool = True) -> None:
+def _write_wheel(
+    path: Path, *, include_typed: bool = True, include_legacy_tsemo: bool = False
+) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("qpots/__init__.py", "")
         if include_typed:
             archive.writestr("qpots/py.typed", "")
+        archive.writestr("qpots-2.1.0.dist-info/licenses/THIRD_PARTY_NOTICES.md", "notice")
+        if include_legacy_tsemo:
+            archive.writestr("qpots/TS-EMO/TSEMO_run.m", "legacy")
         archive.writestr("qpots-2.1.0.dist-info/METADATA", METADATA)
         archive.writestr("qpots-2.1.0.dist-info/WHEEL", WHEEL_METADATA)
 
 
-def _write_sdist(path: Path, *, include_requirements: bool = False) -> None:
+def _write_sdist(
+    path: Path, *, include_requirements: bool = False, include_legacy_tsemo: bool = False
+) -> None:
     members = {
         "qpots-2.1.0/PKG-INFO": METADATA,
         "qpots-2.1.0/qpots/py.typed": b"",
         "qpots-2.1.0/tools/verify_distribution.py": b"",
         "qpots-2.1.0/ACCEPTANCE.md": b"",
+        "qpots-2.1.0/THIRD_PARTY_NOTICES.md": b"notice",
     }
     if include_requirements:
         members["qpots-2.1.0/requirements.txt"] = b"torch"
+    if include_legacy_tsemo:
+        members["qpots-2.1.0/qpots/TS-EMO/TSEMO_run.m"] = b"legacy"
     with tarfile.open(path, "w:gz") as archive:
         for name, content in members.items():
             info = tarfile.TarInfo(name)
@@ -73,6 +83,14 @@ def test_sdist_rejects_obsolete_dependency_manifest(tmp_path):
     _write_sdist(tmp_path / "qpots-2.1.0.tar.gz", include_requirements=True)
 
     with pytest.raises(ValueError, match="obsolete dependency manifests"):
+        verify_dist_directory(tmp_path)
+
+
+def test_distributions_reject_bundled_tsemo_sources(tmp_path):
+    _write_wheel(tmp_path / "qpots-2.1.0-py3-none-any.whl", include_legacy_tsemo=True)
+    _write_sdist(tmp_path / "qpots-2.1.0.tar.gz")
+
+    with pytest.raises(ValueError, match="bundled TS-EMO sources"):
         verify_dist_directory(tmp_path)
 
 
