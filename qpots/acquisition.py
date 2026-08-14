@@ -1,3 +1,4 @@
+from os import PathLike
 from typing import Callable, Optional
 
 import torch
@@ -35,6 +36,7 @@ from torch import Tensor
 from qpots.config import RuntimeConfig, as_tensor, resolve_runtime, tensor_kwargs, to_runtime
 from qpots.function import Function
 from qpots.tsemo_runner import TSEMORunner
+from qpots.utils._constraints import penalize_infeasible_objectives
 from qpots.utils.pymoo_problem import PyMooFunction, nsga2
 from qpots.utils.utils import (
     select_candidates,
@@ -213,10 +215,7 @@ class Acquisition:
         Ys_ = unstandardize(torch.cat(samples_list, -1), gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            ind_feasible = Ys_[..., -self.ncons :] <= 0
-            Ys_[
-                ~ind_feasible.squeeze(), : self.nobj
-            ] = -1e12  # Arbitrary low value for infeasible points
+            Ys_ = penalize_infeasible_objectives(Ys_, self.nobj, self.ncons)
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
@@ -252,8 +251,7 @@ class Acquisition:
         Ys_ = unstandardize(torch.cat(Ys_, -1), gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            ind_feasible = (Ys_[..., -self.ncons :] >= 0).all(dim=-1)
-            Ys_[~ind_feasible.squeeze(), : self.nobj] = -1e12  # Penalize infeasible points
+            Ys_ = penalize_infeasible_objectives(Ys_, self.nobj, self.ncons)
             Ys = Ys_[..., : self.nobj]
         else:
             Ys = Ys_
@@ -293,8 +291,7 @@ class Acquisition:
         sampled_values = unstandardize_ignore_nan(standardized_samples, gps.train_y.to(self.device))
 
         if self.ncons > 0:
-            feasible = (sampled_values[..., -self.ncons :] >= 0).all(dim=-1)
-            sampled_values[~feasible.squeeze(), : self.nobj] = -1e12
+            sampled_values = penalize_infeasible_objectives(sampled_values, self.nobj, self.ncons)
             objective_samples = sampled_values[..., : self.nobj]
         else:
             objective_samples = sampled_values
@@ -703,7 +700,15 @@ class Acquisition:
         )
         return draw_sobol_samples(bounds=standard_bounds, n=1, q=self.q).squeeze(0).to(self.device)
 
-    def tsemo(self, save_dir: str, iters: int, ref_point: Tensor, train_shape: int, rep: int = 0):
+    def tsemo(
+        self,
+        save_dir: str,
+        iters: int,
+        ref_point: Tensor,
+        train_shape: int,
+        rep: int = 0,
+        tsemo_path: str | PathLike[str] | None = None,
+    ):
         """
         Perform Thompson Sampling Efficient Multiobjective Optimization (TS-EMO).
 
@@ -719,6 +724,9 @@ class Acquisition:
             The shape for determining the size of bounds.
         rep : int, optional
             The repetition of the experiment. Defaults to 0.
+        tsemo_path : str or path-like, optional
+            Root of a separately obtained TS-EMO checkout. Required when this
+            optional baseline is used.
 
         Returns
         -------
@@ -741,6 +749,7 @@ class Acquisition:
             ub=[1.0] * self.gps.train_x.shape[1],
             iters=iters,
             batch_number=self.q,
+            tsemo_path=tsemo_path,
         )
         x, y, times = ts.tsemo_run(save_dir, rep)
         hv, pf = ts.tsemo_hypervolume(y, ref_point, train_shape, iters)

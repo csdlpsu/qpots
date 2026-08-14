@@ -142,6 +142,44 @@ def test_gp_posterior_with_constraints():
     model_2.posterior.assert_called_once()
     model_3.posterior.assert_called_once()
 
+
+@patch("qpots.acquisition.unstandardize", side_effect=lambda values, _train_y: values)
+def test_nystrom_posterior_uses_nonnegative_multi_constraint_feasibility(_unstandardize):
+    func = Mock(dim=2)
+    gps = Mock()
+    gps.nobj = 2
+    gps.ncons = 2
+    gps.bounds = torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.float64)
+    gps.train_y = torch.zeros(3, 4, dtype=torch.float64)
+
+    columns = [
+        torch.tensor([[1.0], [3.0], [5.0]], dtype=torch.float64),
+        torch.tensor([[2.0], [4.0], [6.0]], dtype=torch.float64),
+        torch.tensor([[0.0], [-0.1], [1.0]], dtype=torch.float64),
+        torch.tensor([[0.5], [1.0], [1.0]], dtype=torch.float64),
+    ]
+    gps.models = []
+    for mean in columns:
+        posterior = Mock()
+        posterior.mean = mean
+        posterior.mvn.covariance_matrix = torch.zeros(3, 3, dtype=torch.float64)
+        model = Mock()
+        model.posterior.return_value = posterior
+        gps.models.append(model)
+
+    acquisition = Acquisition(func=func, gps=gps, device="cpu", dtype=torch.float64)
+    result = acquisition._nystrom_approx(
+        torch.tensor([[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]], dtype=torch.float64),
+        gps,
+        m=1,
+        col_choice="random",
+    )
+
+    expected = torch.tensor(
+        [[-1.0, -2.0], [1e12, 1e12], [-5.0, -6.0]], dtype=torch.float64
+    )
+    assert torch.equal(result, expected)
+
 @patch("qpots.utils.pymoo_problem.nsga2")
 @pytest.mark.parametrize("q", [1, 2, 3, 4])
 def test_qpots(mock_func, real_func, q):

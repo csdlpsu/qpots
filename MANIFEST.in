@@ -1,5 +1,6 @@
 include ACCEPTANCE.md
 include CHANGELOG.md
+include THIRD_PARTY_NOTICES.md
 include tools/extract_release_notes.py
 include tools/verify_distribution.py
 global-exclude __pycache__/*

@@ -11,8 +11,11 @@ The task-correlation gate and oracle-subset rule are described in the companion
 methods manuscript, *qPOTS-DOE: Batch Pareto Optimal Thompson Sampling with
 Decoupled Oracle Evaluations for Constrained Multiobjective Bayesian
 Optimization* (Renganathan, Carlson, and Bachman, manuscript under review).
-This guide focuses on using the implemented interfaces. A persistent preprint
-link will be added here when the companion manuscript becomes public.
+There is not yet a public preprint for that manuscript. The underlying qPOTS
+posterior-sampling method is published in the `AISTATS 2025 proceedings
+<https://proceedings.mlr.press/v258/renganathan25a.html>`_ and is also available
+as an `arXiv preprint <https://arxiv.org/abs/2310.15788>`_. This guide focuses
+on the implemented decoupled-evaluation interfaces.
 
 What is an oracle?
 ------------------
@@ -69,6 +72,30 @@ locations:
 The figure illustrates task-specific observations for Branin and Currin, the
 posterior total-correlation field used for gating, and uncertainty reduction
 from information sharing between tasks.
+
+Reproduce Figure 2
+------------------
+
+The seeded reproduction script runs qPOTS-Decoupled, refits the final
+multitask model, and saves both the figure and the plotted arrays:
+
+.. code-block:: console
+
+   python -m examples.decoupled_branin_currin_figure \
+       --output assets/qpots_doe_total_correlation.png
+
+Use the reduced CPU configuration to verify the workflow without replacing the
+manuscript asset:
+
+.. code-block:: console
+
+   python -m examples.decoupled_branin_currin_figure --quick \
+       --output /tmp/qpots-decoupled-quick.png
+
+.. literalinclude:: ../../examples/decoupled_branin_currin_figure.py
+   :language: python
+   :linenos:
+   :caption: decoupled_branin_currin_figure.py
 
 Configure qPOTS-Decoupled
 -------------------------

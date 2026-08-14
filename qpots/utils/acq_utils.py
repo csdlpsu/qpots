@@ -57,6 +57,8 @@ from botorch.acquisition.multi_objective.utils import (
 
 from botorch.models.utils import check_no_nans
 
+from qpots.utils._constraints import constraint_feasibility
+
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from botorch.utils.transforms import (
     average_over_ensemble_models,
@@ -205,10 +207,9 @@ def hypervolume_from_posterior_mean_gp(
     #print("Pulling the Posterior")
     post = model.posterior(X)
     Y_mean = post.mean
-    if ncons>0:
-        ind_feasible = (Y_mean[..., -ncons :] >= 0).all(dim=-1)
-        Y_mean[~ind_feasible.squeeze(), -ncons :] = -1e12  # Penalize infeasible points
-        Y_mean = Y_mean[...,:-ncons]
+    if ncons > 0:
+        feasible = constraint_feasibility(Y_mean, ncons)
+        Y_mean = Y_mean[feasible, :-ncons]
 
     
     

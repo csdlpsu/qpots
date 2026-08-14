@@ -18,7 +18,7 @@ def test_pyproject_is_the_only_dependency_manifest():
     metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
 
     assert metadata["project"]["license"] == "GPL-3.0-only"
-    assert metadata["project"]["license-files"] == ["LICENSE"]
+    assert metadata["project"]["license-files"] == ["LICENSE", "THIRD_PARTY_NOTICES.md"]
     assert not (PROJECT_ROOT / "requirements.txt").exists()
     assert not (PROJECT_ROOT / "tests" / "requirements.txt").exists()
     assert all("<3" not in dependency for dependency in metadata["project"]["dependencies"])
@@ -40,3 +40,10 @@ def test_core_package_imports_without_optional_example_modules():
     import qpots
 
     assert qpots.QPOTSRunner is not None
+
+
+def test_legacy_tsemo_sources_are_not_packaged():
+    metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text())
+
+    assert metadata["tool"]["setuptools"]["package-data"]["qpots"] == ["py.typed"]
+    assert not (PROJECT_ROOT / "qpots" / "TS-EMO").exists()

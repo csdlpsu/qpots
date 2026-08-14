@@ -42,7 +42,10 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[test,docs]"
 ```
 
-qPOTS requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, and 3.13. The core qPOTS package does not require MATLAB. MATLAB Engine is only needed for users who want to run the bundled TS-EMO baseline.
+qPOTS requires Python 3.11 or newer and is continuously tested on Python 3.11,
+3.12, and 3.13. The core package does not require MATLAB. MATLAB Engine is only
+needed for the optional interoperability layer, and users provide their own
+authorized TS-EMO checkout through ``tsemo_path``.
 
 ## Running Tests
 

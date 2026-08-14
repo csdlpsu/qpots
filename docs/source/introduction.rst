@@ -77,5 +77,6 @@ Scope and references
 
 The original qPOTS method is described in the `AISTATS 2025 paper
 <https://proceedings.mlr.press/v258/renganathan25a.html>`_. The package also
-contains baseline acquisition methods and an optional TS-EMO integration for
-comparative research. See :doc:`citation` for the complete citation.
+contains baseline acquisition methods and an optional interoperability layer
+for a separately obtained TS-EMO checkout. The MATLAB TS-EMO implementation is
+not redistributed by qPOTS. See :doc:`citation` for the complete qPOTS citation.

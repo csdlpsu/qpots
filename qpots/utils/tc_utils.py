@@ -31,6 +31,7 @@ from botorch.fit import fit_gpytorch_mll
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.sampling import SobolQMCNormalSampler
 from qpots.config import as_tensor
+from qpots.utils._constraints import penalize_infeasible_objectives
 
 def unstandardize_ignore_nan(Y: Tensor, train_y: Tensor, correction: int = 1) -> Tensor:
     """
@@ -237,10 +238,7 @@ def get_model_identified_hv_maximizing_set(
 
             ## Constraint Handling
             if ncons > 0:
-
-                #penalizing constraint violation
-                ind_feasible = (y[..., -ncons :] >= 0).all(dim=-1)
-                y[~ind_feasible.squeeze(), : problem.nobj] = -1e12  # Penalize infeasible points
+                y = penalize_infeasible_objectives(y, problem.nobj, ncons)
                 f = y[..., : problem.nobj]
 
             else:
@@ -460,13 +458,16 @@ def corr_and_total_correlation(
     m = R.shape[-1]
     eye = torch.eye(m, device=R.device, dtype=R.dtype).expand(R.shape[:-2] + (m, m))
     
-    Rj = R + jitter * eye
+    # Renormalize after adding jitter so the stabilized matrix remains a
+    # correlation matrix with unit diagonal. Without this normalization,
+    # even independent tasks produce a negative numerical total correlation.
+    Rj = (R + jitter * eye) / (1.0 + jitter)
 
     #print("Rj: \n",Rj)
     try: #Runs when Rj is positive definite
         L = torch.linalg.cholesky(Rj)
         logdet = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
-        TC = -0.5 * logdet
+        TC = (-0.5 * logdet).clamp_min(0.0)
     except RuntimeError: #If not, run coupled evaluation at this location (TC=None)
         print("R was not invertible, performing coupled evaluation")
         TC=None 

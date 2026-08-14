@@ -1,7 +1,9 @@
 qpots.tsemo_runner
 ==================
 
-Python wrapper around the bundled MATLAB TS-EMO implementation.
+Optional Python interoperability layer for a separately obtained MATLAB
+TS-EMO checkout. qPOTS does not redistribute the upstream MATLAB sources;
+users supply their authorized checkout through ``tsemo_path``.
 
 .. automodule:: qpots.tsemo_runner
    :members:

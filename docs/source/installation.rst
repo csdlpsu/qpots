@@ -38,9 +38,11 @@ MPI-based high-performance-computing examples additionally require ``mpi4py``:
 
    python -m pip install "qpots[hpc]"
 
-The MATLAB Engine is needed only for the optional TS-EMO baseline. Core qPOTS,
-the BoTorch-based acquisition functions, and the tutorials do not require
-MATLAB. Install the engine version matching the local MATLAB release by
+The MATLAB Engine is needed only for the optional TS-EMO interoperability
+layer. Core qPOTS, the BoTorch-based acquisition functions, and the tutorials
+do not require MATLAB. qPOTS does not redistribute the TS-EMO MATLAB sources;
+users must obtain an authorized checkout independently and pass its root as
+``tsemo_path``. Install the engine version matching the local MATLAB release by
 following the `MathWorks installation guide
 <https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html>`_.
 For example, MATLAB R2023b uses:
@@ -48,6 +50,16 @@ For example, MATLAB R2023b uses:
 .. code-block:: console
 
    python -m pip install matlabengine==23.2.1
+
+For example:
+
+.. code-block:: python
+
+   runner = TSEMORunner(..., tsemo_path="/path/to/external/TS-EMO")
+
+The path must contain ``TSEMO_run.m`` and its original support directories.
+See ``THIRD_PARTY_NOTICES.md`` in the source repository for the distribution
+and provenance policy.
 
 Install from source
 -------------------
@@ -84,6 +96,11 @@ be changed without editing the installed package:
 
 An object's explicit ``device`` or ``dtype`` argument takes precedence over
 the package-wide default. See :doc:`qpots_config` for the complete API.
+
+The continuous-integration test matrix is deliberately pinned to CPU so its
+behavior does not depend on whether a runner exposes CUDA. Device-propagation
+tests cover the runtime configuration API, but the project does not claim a
+CUDA CI job.
 
 Next step
 ---------
