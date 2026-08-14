@@ -8,13 +8,13 @@ tags:
   - Thompson sampling
   - decoupled evaluations
 authors:
-  - name: Kade E. Carlson
-    affiliation: "1"
   - name: Ashwin Renganathan
     orcid: 0000-0001-6948-6932
     affiliation: "1, 2"
   - name: Peter E. Bachman
     affiliation: "1"
+  - name: Kade E. Carlson
+    affiliation: "1"    
 affiliations:
   - name: Department of Aerospace Engineering, The Pennsylvania State University, United States
     index: 1
