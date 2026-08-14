@@ -107,9 +107,7 @@ For complete scripts, see:
 Use **qPOTS-Decoupled** when objectives or constraints can be measured
 separately. A multitask Gaussian process shares information between outputs,
 while a total-correlation gate and mutual-information rule select which output
-tasks to query at each candidate. Earlier project material called this mode
-``qPOTS-DOE`` (decoupled oracle evaluations); the new name avoids confusion
-with the established abbreviation for design of experiments.
+tasks to query at each candidate.
 
 See the dedicated [qPOTS-Decoupled guide](https://qpots.readthedocs.io/en/latest/qpots_doe.html)
 and the [decoupled OSY example](examples/decoupled_osy_example.py).

@@ -80,10 +80,6 @@ provide optional higher-level alternatives:
      - :class:`qpots.QPOTSRunner`
      - Direct :class:`qpots.ModelObject` and :class:`qpots.Acquisition` use
        remains supported.
-   * - ``qPOTS-DOE`` documentation name
-     - ``qPOTS-Decoupled``
-     - Configuration fields and the existing ``qpots_doe`` documentation URL
-       remain unchanged.
 
 All ``Function`` bounds use shape ``(2, dimension)``: lower bounds in the first
 row and upper bounds in the second. This convention now has explicit validation;
