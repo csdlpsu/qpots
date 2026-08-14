@@ -1,15 +1,9 @@
 qPOTS-Decoupled
 ===============
 
-.. important::
-
-   Earlier project material called this mode **qPOTS-DOE**, where DOE meant
-   **decoupled oracle evaluations**. The preferred name is now
-   **qPOTS-Decoupled** to avoid confusion with design of experiments.
-
 The task-correlation gate and oracle-subset rule are described in the companion
-methods manuscript, *qPOTS-DOE: Batch Pareto Optimal Thompson Sampling with
-Decoupled Oracle Evaluations for Constrained Multiobjective Bayesian
+methods manuscript, *qPOTS-Decoupled: Batch Pareto Optimal Thompson Sampling
+with Decoupled Oracle Evaluations for Constrained Multiobjective Bayesian
 Optimization* (Renganathan, Carlson, and Bachman, manuscript under review).
 There is not yet a public preprint for that manuscript. The underlying qPOTS
 posterior-sampling method is published in the `AISTATS 2025 proceedings
