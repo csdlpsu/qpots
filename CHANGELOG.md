@@ -4,17 +4,12 @@
 
 ## v2.2.0
 
-- Fixes constraint handling for multitask and Nyström posterior sampling,
-  constrained posterior-mean hypervolume reporting, and multitask missing-value
-  imputation.
-- Adds reproducible constrained, decoupled, and custom engineering examples,
-  including feasible-front and hypervolume visualizations.
-- Adds Python 3.14 to the supported test matrix and runs the documented
-  constrained workflows against the built wheel outside the source checkout.
-- Stabilizes total-correlation calculations without producing negative values
-  for independent output tasks.
-- Pins the test runtime to CPU and replaces the bundled TS-EMO sources with an
-  optional external-checkout integration through ``tsemo_path``.
+- Fixes constrained multitask posterior sampling and related constraint-handling
+  edge cases.
+- Adds executable examples, clearer documentation, Python 3.14 coverage, and
+  installed-wheel acceptance tests.
+- Improves decoupled-workflow numerical stability and moves optional TS-EMO
+  interoperability to an external checkout.
 
 ## v2.1.0
 
