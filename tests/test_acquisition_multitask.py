@@ -63,6 +63,28 @@ def sgp_gps(branincurrin_func):
     return gps
 
 
+@pytest.fixture(scope="module")
+def constrained_mtgp_gps():
+    """Fitted constrained MultiTaskGP matching the documented posterior path."""
+    torch.manual_seed(11)
+    function = Function("constrainedbc", dim=2, nobj=2)
+    n = 12
+    train_x = torch.rand(n, function.dim, dtype=torch.float64)
+    evaluation = function.evaluate_all(train_x)
+    train_y = torch.cat((evaluation.objectives, evaluation.constraints), dim=-1)
+    gps = ModelObject(
+        train_x=train_x,
+        train_y=train_y,
+        bounds=function.get_bounds(),
+        nobj=function.nobj,
+        ncons=1,
+        ntrain=n,
+        device=torch.device("cpu"),
+    )
+    gps.fit_multitask_gp()
+    return function, gps
+
+
 # ---------------------------------------------------------------------------
 # _mt_gp_posterior
 # ---------------------------------------------------------------------------
@@ -153,6 +175,28 @@ def test_mt_gp_posterior_preserves_sample_dimension_with_constraints(_unstandard
     )
     assert result.shape == (1, 3, 2)
     assert torch.equal(result, expected)
+
+
+def test_qpots_mt1_with_constraints_preserves_population_dimension(constrained_mtgp_gps):
+    """A real constrained MTGP completes the NSGA-II posterior evaluation."""
+    function, gps = constrained_mtgp_gps
+    acquisition = Acquisition(func=function, gps=gps, q=1)
+    result = acquisition.qpots(
+        function.get_bounds(),
+        iteration=1,
+        nystrom=0,
+        mt=1,
+        partial_info=0,
+        iters=1,
+        dim=function.dim,
+        nychoice="random",
+        q=1,
+        ngen=1,
+    )
+
+    assert result.shape == (1, function.dim)
+    assert torch.isfinite(result).all()
+    assert ((result >= 0.0) & (result <= 1.0)).all()
 
 
 # ---------------------------------------------------------------------------

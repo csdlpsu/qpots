@@ -7,3 +7,6 @@ qpots.function
    :undoc-members:
    :show-inheritance:
    :special-members: __init__
+
+.. autoclass:: qpots.function.EvaluationResult
+   :members:

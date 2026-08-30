@@ -20,13 +20,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install test and build tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[test,docs]" build twine
+          python -m pip install ".[test,docs,examples]" build twine
 
       - name: Validate version and prepare release notes
         run: |
@@ -51,6 +51,31 @@ jobs:
           python -m build --sdist --wheel
           python -m twine check dist/*
           python tools/verify_distribution.py dist
+
+      - name: Smoke-test constrained workflows from the installed wheel
+        run: |
+          python -m pip uninstall -y qpots
+          python -m pip install --no-deps dist/*.whl
+          cd "${RUNNER_TEMP}"
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          import qpots
+
+          package_file = Path(qpots.__file__).resolve()
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          expected_version = tomllib.loads((workspace / "pyproject.toml").read_text())["project"][
+              "version"
+          ]
+          assert qpots.__version__ == expected_version
+          assert not package_file.is_relative_to(workspace), package_file
+          PY
+          python "${GITHUB_WORKSPACE}/examples/constrained_example.py" \
+            --quick --output-dir "${RUNNER_TEMP}/weldedbeam"
+          python "${GITHUB_WORKSPACE}/examples/decoupled_osy_example.py" \
+            --quick --output-dir "${RUNNER_TEMP}/osy"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4

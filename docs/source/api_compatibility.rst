@@ -68,17 +68,18 @@ provide optional higher-level alternatives:
      - New alternative
      - Compatibility behavior
    * - ``DEFAULT_DEVICE`` and ``DEFAULT_DTYPE``
-     - :class:`qpots.RuntimeConfig` and
-       :func:`qpots.set_default_runtime`
+     - :class:`qpots.config.RuntimeConfig` and
+       :func:`qpots.config.set_default_runtime`
      - Constants remain available; runtime objects allow configuration without
        editing installed source.
    * - ``Function.evaluate()`` and ``get_cons()``
      - ``Function.evaluate_all()`` returning
-       :class:`qpots.EvaluationResult`
+       :class:`qpots.function.EvaluationResult`
      - Existing objective-only and separate-constraint calls are unchanged.
    * - Manual model/acquisition loop
-     - :class:`qpots.QPOTSRunner`
-     - Direct :class:`qpots.ModelObject` and :class:`qpots.Acquisition` use
+     - :class:`qpots.runner.QPOTSRunner`
+     - Direct :class:`qpots.model_object.ModelObject` and
+       :class:`qpots.acquisition.Acquisition` use
        remains supported.
 
 All ``Function`` bounds use shape ``(2, dimension)``: lower bounds in the first

@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--quick",
         action="store_true",
-        help="Use the reviewer reproduction settings on CPU.",
+        help="Use a small CPU configuration for an end-to-end smoke test.",
     )
     return parser.parse_args()
 

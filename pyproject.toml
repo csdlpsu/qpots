@@ -13,7 +13,7 @@ include = ["qpots*"]
 
 [project]
 name = "qpots"
-version = "2.1.0"
+version = "2.2.0"
 authors = [
   { name="Kade E. Carlson", email="kkc5441@psu.edu" },
   { name="Ashwin Renganathan", email="ashwin.renganathan@psu.edu" },
@@ -27,6 +27,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
 license = "GPL-3.0-only"
