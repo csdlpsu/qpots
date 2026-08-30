@@ -67,11 +67,11 @@ The visualization shows task-specific observations for Branin and Currin, the
 posterior total-correlation field used for gating, and uncertainty reduction
 from information sharing between tasks.
 
-Reproduce the example visualization
------------------------------------
+Generate figure
+---------------
 
-The seeded reproduction script runs qPOTS-Decoupled, refits the final
-multitask model, and saves both the visualization and the plotted arrays:
+The qPOTS-Decoupled script refits the final multitask model and saves both the
+visualization and the plotted arrays:
 
 .. code-block:: console
 
