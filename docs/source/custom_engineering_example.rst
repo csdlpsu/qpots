@@ -40,6 +40,11 @@ A small CPU smoke run is also available:
    python -m examples.custom_function_example --quick \
        --output /tmp/cantilever-qPOTS-quick.png
 
+These commands assume a source checkout. With a PyPI-only installation, save
+the complete script below as ``main.py`` and replace
+``python -m examples.custom_function_example`` with ``python main.py``. See
+:ref:`Running the repository examples <running-the-repository-examples>`.
+
 The generated figure distinguishes infeasible and feasible designs, highlights
 the feasible nondominated set, and reports feasible hypervolume as observations
 accumulate. Hypervolume filtering removes infeasible rows before discarding the

@@ -37,11 +37,16 @@ Run the example
 
    python -m examples.constrained_example
 
-For the reviewer-sized end-to-end reproduction on CPU, use:
+For a small end-to-end check on CPU, use:
 
 .. code-block:: console
 
    python -m examples.constrained_example --quick --output-dir /tmp/qpots-weldedbeam
+
+These commands assume a source checkout. With a PyPI-only installation, save
+the complete script above as ``main.py`` and replace
+``python -m examples.constrained_example`` with ``python main.py``. See
+:ref:`Running the repository examples <running-the-repository-examples>`.
 
 The output tensor has two objective columns followed by four constraint
 columns. A row is feasible only when **all four** constraint values are

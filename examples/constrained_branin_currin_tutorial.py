@@ -1,4 +1,4 @@
-"""Reproduce the constrained Branin--Currin workflow illustrated in the paper.
+"""Demonstrate constrained qPOTS on the Branin--Currin benchmark.
 
 This example requires the ``examples`` extra: ``pip install 'qpots[examples]'``.
 """

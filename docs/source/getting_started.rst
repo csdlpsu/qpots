@@ -131,7 +131,7 @@ Next steps
 ----------
 
 * Follow :doc:`constrained_tutorial` for objectives with feasibility
-  constraints and a reproduction of the JOSS paper's Figure 1 workflow.
+  constraints.
 * Read :doc:`qpots_doe` when objectives or constraints can be evaluated
   separately.
 * See :doc:`qpots_runner` for all runner and configuration fields.

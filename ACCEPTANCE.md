@@ -11,7 +11,7 @@ A change is accepted only when every applicable gate below passes.
 
 | Area | Automated evidence | Acceptance criterion |
 | --- | --- | --- |
-| Supported Python | `python -m pytest -q tests/` on Python 3.11, 3.12, and 3.13 | All tests pass on every supported version. |
+| Supported Python | `python -m pytest -q tests/` on Python 3.11, 3.12, 3.13, and 3.14 | All tests pass on every supported version. |
 | Core algorithms | Acquisition, model, runner, function, and utility tests | Constrained, unconstrained, multitask, Nyström, partial-information, and TS-EMO wrapper tests pass. |
 | Public interfaces | `tests/test_public_api.py` and `tests/test_compatibility.py` | Supported top-level exports and qPOTS 2.0 call patterns remain available. |
 | Runtime and evaluation | `tests/test_config.py`, `tests/test_function.py`, and `tests/test_runner.py` | Runtime precedence, evaluation shapes, bounds, constraints, seeds, callbacks, fit counts, and physical/normalized coordinates remain correct. |
@@ -19,7 +19,7 @@ A change is accepted only when every applicable gate below passes.
 | Examples | `python -m compileall -q examples` | Every checked-in Python example is syntactically valid on the acceptance Python version. |
 | Documentation | `sphinx -W -b html` | The complete documentation builds with warnings treated as errors. |
 | Packaging | `python -m build`, `twine check`, and `tools/verify_distribution.py` | Exactly one valid wheel and source archive are produced with correct metadata, extras, typing marker, and dependency declarations. |
-| Installed artifact | Wheel reinstall followed by an import outside the checkout | The installed wheel reports a version and exposes `QPOTSRunner` without relying on the source tree. |
+| Installed artifact | Wheel reinstall followed by imports and documented quick examples outside the checkout | The installed wheel reports the expected version and runs the constrained multitask workflows without relying on the source tree. |
 | Paper | Draft PDF workflow | The JOSS paper builds through the Open Journals draft action. |
 
 The `acceptance` job runs only after all Python matrix jobs pass. It uploads the

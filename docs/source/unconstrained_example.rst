@@ -36,5 +36,9 @@ Run the example
 
    python -m examples.unconstrained_branin
 
+This command assumes a source checkout. With a PyPI-only installation, save
+the complete script above as ``main.py`` and run ``python main.py``. See
+:ref:`Running the repository examples <running-the-repository-examples>`.
+
 Reduce ``iterations`` and ``generations`` for a quick local check. For a
 line-by-line introduction to the same workflow, see :doc:`getting_started`.

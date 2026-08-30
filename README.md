@@ -46,7 +46,7 @@ cd qpots
 pip install .
 ```
 
-$q\texttt{POTS}$ requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, and 3.13. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, scikit-learn, and pymoo.
+$q\texttt{POTS}$ requires Python 3.11 or newer and is continuously tested on Python 3.11, 3.12, 3.13, and 3.14. The core $q\texttt{POTS}$ implementation uses Python dependencies installed by `pip`, including BoTorch, PyTorch, GPyTorch, NumPy, SciPy, scikit-learn, and pymoo.
 
 ### Optional MATLAB Engine
 
@@ -98,7 +98,7 @@ For complete scripts, see:
 - [Constrained optimization](examples/constrained_example.py)
 - [Decoupled optimization (OSY)](examples/decoupled_osy_example.py)
 - [Custom constrained cantilever design](examples/custom_function_example.py)
-- [qPOTS-Decoupled Figure 2 reproduction](examples/decoupled_branin_currin_figure.py)
+- [qPOTS-Decoupled visualization](examples/decoupled_branin_currin_figure.py)
 - [Multiple acquisition functions](examples/multiple_acquisitions_example.py)
 - [HPC-style runs](examples/hpc_example.py)
 

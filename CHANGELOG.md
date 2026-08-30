@@ -2,15 +2,14 @@
 
 ## Unreleased
 
-- Fixes constraint handling for multitask and Nyström posterior sampling,
-  constrained posterior-mean hypervolume reporting, and multitask missing-value
-  imputation.
-- Adds reproducible constrained, decoupled, and custom engineering examples,
-  including feasible-front and hypervolume visualizations.
-- Stabilizes total-correlation calculations without producing negative values
-  for independent output tasks.
-- Pins the test runtime to CPU and replaces the bundled TS-EMO sources with an
-  optional external-checkout integration through ``tsemo_path``.
+## v2.2.0
+
+- Fixes constrained multitask posterior sampling and related constraint-handling
+  edge cases.
+- Adds executable examples, clearer documentation, Python 3.14 coverage, and
+  installed-wheel acceptance tests.
+- Improves decoupled-workflow numerical stability and moves optional TS-EMO
+  interoperability to an external checkout.
 
 ## v2.1.0
 
@@ -21,7 +20,7 @@
 - Automates validated PyPI publishing and GitHub Releases from semantic version tags.
 - Uses an absolute logo URL so the project image renders on PyPI.
 - Adds an introduction and statement of need, complete installation and
-  citation guidance, guided optimization tutorials, a Figure 1 reproduction,
+  citation guidance, guided optimization tutorials, a constrained visualization,
   and dedicated qPOTS-Decoupled documentation.
 - Defines and tests the supported top-level API, ships a ``py.typed`` marker,
   and documents compatibility and deprecation guarantees for qPOTS 2.x users.

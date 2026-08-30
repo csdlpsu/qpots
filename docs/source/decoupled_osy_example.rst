@@ -54,11 +54,16 @@ Run the example
 
    python -m examples.decoupled_osy_example
 
-The configuration used to reproduce the constraint-handling review report is:
+For a small end-to-end check on CPU, use:
 
 .. code-block:: console
 
    python -m examples.decoupled_osy_example --quick --output-dir /tmp/qpots-osy
+
+These commands assume a source checkout. With a PyPI-only installation, save
+the complete script above as ``main.py`` and replace
+``python -m examples.decoupled_osy_example`` with ``python main.py``. See
+:ref:`Running the repository examples <running-the-repository-examples>`.
 
 This example is substantially more expensive than the introductory examples
 because it refits a joint multitask Gaussian process after every partially

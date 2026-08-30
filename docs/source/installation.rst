@@ -5,7 +5,7 @@ Requirements
 ------------
 
 qPOTS requires Python 3.11 or newer and is continuously tested on Python 3.11,
-3.12, and 3.13. A virtual environment is recommended so that optimization
+3.12, 3.13, and 3.14. A virtual environment is recommended so that optimization
 dependencies remain isolated from other projects.
 
 Install from PyPI
@@ -22,6 +22,13 @@ Verify the installation:
 .. code-block:: console
 
    python -c "from importlib.metadata import version; print(version('qpots'))"
+
+The printed version should match |release| for this documentation build. If an
+older version is installed, upgrade it before running the examples:
+
+.. code-block:: console
+
+   python -m pip install --upgrade "qpots>=2.2.0"
 
 Optional dependencies
 ---------------------
@@ -77,8 +84,19 @@ documentation tools:
 
 .. code-block:: console
 
-   python -m pip install -e ".[test,docs]"
+   python -m pip install -e ".[test,docs,examples]"
    python -m pytest -q tests/
+
+.. _running-the-repository-examples:
+
+Running the repository examples
+-------------------------------
+
+Commands beginning with ``python -m examples`` run scripts from the source
+repository; the ``examples`` directory is not installed as a Python package by
+``pip install qpots``. Run those commands from the root of a matching source
+checkout. With a PyPI-only installation, save the complete script displayed on
+an example page as ``main.py`` and run ``python main.py`` instead.
 
 Hardware and precision
 ----------------------

@@ -8,6 +8,7 @@ post_process_clean.ipynb
 */.pytest_cache
 
 .vscode/
+.idea/
 
 build/
 dist/
