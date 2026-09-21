@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v2.2.1
+
+- Incorporates the final JOSS editorial revisions to the manuscript and bibliography.
+- Aligns the archival citation title with the paper and records the paper's author
+  order and all three authors' ORCID identifiers.
+- Clarifies qPOTS-Decoupled figure reproduction instructions.
+- Preserves the reviewed optimization implementation from v2.2.0.
+
 ## v2.2.0
 
 - Fixes constrained multitask posterior sampling and related constraint-handling

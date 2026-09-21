@@ -1,8 +1,9 @@
 cff-version: 1.2.0
+type: software
 message: "If you use qPOTS in your research, please cite the JOSS paper and the AISTATS qPOTS paper."
-title: "qPOTS: Batch Pareto optimal Thompson sampling for multiobjective Bayesian optimization"
-version: 2.2.0
-date-released: 2026-08-30
+title: "qPOTS: A Python Package for Sample-efficient Batch Constrained Multiobjective Bayesian Optimization"
+version: 2.2.1
+date-released: 2026-09-21
 license: GPL-3.0-only
 repository-code: "https://github.com/csdlpsu/qpots"
 authors:
@@ -17,7 +18,7 @@ authors:
     orcid: "https://orcid.org/0009-0007-3662-2660"
 preferred-citation:
   type: article
-  title: "qPOTS: Batch Pareto optimal Thompson sampling for multiobjective Bayesian optimization"
+  title: "qPOTS: A Python Package for Sample-efficient Batch Constrained Multiobjective Bayesian Optimization"
   authors:
     - family-names: Renganathan
       given-names: Ashwin
